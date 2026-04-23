@@ -50,14 +50,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build Tauri app (signed + notarized)
+      - name: Build Tauri app (unsigned)
         env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          TAURI_SKIP_SIGNING: true
         run: npm run tauri build
 
       - name: Upload macOS artifacts
@@ -110,15 +105,19 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build Tauri app (Intel, signed + notarized)
+      - name: Build Tauri app (Intel, unsigned)
         env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          TAURI_SKIP_SIGNING: true
         run: npm run tauri build -- --target x86_64-apple-darwin
+
+
+
+
+
+
+
+
+
 
       - name: Upload macOS Intel artifacts
         uses: actions/upload-artifact@v4
