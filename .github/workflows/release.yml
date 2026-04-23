@@ -17,22 +17,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Apple Certificate
-        env:
-          CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        run: |
-          CERT_PATH=$RUNNER_TEMP/certificate.p12
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-
-          echo -n "$CERTIFICATE" | base64 --decode -o $CERT_PATH
-
-          security create-keychain -p "" $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "" $KEYCHAIN_PATH
-          security import $CERT_PATH -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security set-key-partition-list -S apple-tool:,apple: -k "" $KEYCHAIN_PATH
-          security list-keychains -d user -s $KEYCHAIN_PATH login.keychain
+      #       - name: Install Apple Certificate
+      #         env:
+      #           CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      #           CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      #         run: |
+      #           CERT_PATH=$RUNNER_TEMP/certificate.p12
+      #           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+      # 
+      #           echo -n "$CERTIFICATE" | base64 --decode -o $CERT_PATH
+      # 
+      #           security create-keychain -p "" $KEYCHAIN_PATH
+      #           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+      #           security unlock-keychain -p "" $KEYCHAIN_PATH
+      #           security import $CERT_PATH -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+      #           security set-key-partition-list -S apple-tool:,apple: -k "" $KEYCHAIN_PATH
+      #           security list-keychains -d user -s $KEYCHAIN_PATH login.keychain
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -75,22 +75,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Apple Certificate
-        env:
-          CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        run: |
-          CERT_PATH=$RUNNER_TEMP/certificate.p12
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-
-          echo -n "$CERTIFICATE" | base64 --decode -o $CERT_PATH
-
-          security create-keychain -p "" $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "" $KEYCHAIN_PATH
-          security import $CERT_PATH -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security set-key-partition-list -S apple-tool:,apple: -k "" $KEYCHAIN_PATH
-          security list-keychains -d user -s $KEYCHAIN_PATH login.keychain
+      #       - name: Install Apple Certificate
+      #         env:
+      #           CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      #           CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      #         run: |
+      #           CERT_PATH=$RUNNER_TEMP/certificate.p12
+      #           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+      # 
+      #           echo -n "$CERTIFICATE" | base64 --decode -o $CERT_PATH
+      # 
+      #           security create-keychain -p "" $KEYCHAIN_PATH
+      #           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+      #           security unlock-keychain -p "" $KEYCHAIN_PATH
+      #           security import $CERT_PATH -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+      #           security set-key-partition-list -S apple-tool:,apple: -k "" $KEYCHAIN_PATH
+      #           security list-keychains -d user -s $KEYCHAIN_PATH login.keychain
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
