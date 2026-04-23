@@ -1,0 +1,66 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Rust build artifacts
+src-tauri/target/
+
+# DMG files
+*.dmg
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# Tauri updater signing (private key — never commit)
+.tauri/*.key
+
+# Tauri generated
+src-tauri/gen/
+scripts/__pycache__/
+test_audio.wav
+
+# Agent configs (internal)
+CLAUDE.md
+GEMINI.md
+
+# Internal dev files (private repo only)
+dev-logs/
+lessons-learned/
+docs/01_internal_mechanisms.md
+docs/02_developer_motives_and_hidden_controls.md
+docs/04_reverse_engineering_guide.md
+docs/experiment_mlx_whisper.md
+docs/mlx_optimization_plan.md
+docs/windows_handoff.md
+docs/windows_port_plan.md
+
+# Dev/benchmark scripts (private repo only)
+scripts/benchmark_*.py
+scripts/test_*.py
+
+# Private files (dev-logs, agent instructions, internal docs)
+.private/
+GEMINI.md
+CLAUDE.md

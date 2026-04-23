@@ -1,0 +1,1274 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HaLin AI Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles/main.css" />
+  <link rel="stylesheet" href="styles/app-shell.css" />
+</head>
+
+<body>
+  <!-- ═══════════════════ LOGIN VIEW — minimal SaaS ═══════════════════ -->
+  <div id="login-view" class="view active">
+    <header class="login-chrome login-chrome--minimal" data-tauri-drag-region>
+      <div class="login-chrome-spacer" data-tauri-drag-region aria-hidden="true"></div>
+      <div class="login-window-actions">
+        <button type="button" id="btn-login-minimize" class="icon-btn" title="Thu nhỏ">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+        <button type="button" id="btn-login-close" class="icon-btn close-btn" title="Đóng">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+    </header>
+    <div class="login-scroll login-scroll--centered">
+      <div class="login-layout login-layout--minimal">
+        <div class="login-card login-card--saas">
+          <div class="login-card-hero">
+            <img src="assets/logo.png" alt="HanoiLink" class="login-card-logo" />
+            <h1 class="login-title">Đăng nhập vào HaLin</h1>
+            <p class="login-subtitle">Quản lý và phân tích buổi học với AI</p>
+          </div>
+
+          <form id="form-login-email" class="login-form login-form--saas" autocomplete="on">
+            <div class="login-field-block">
+              <label class="login-field-label login-field-label--saas" for="input-login-email">Email</label>
+              <input id="input-login-email" class="input login-input login-input--saas" type="email" placeholder="ten@truong.edu" autocomplete="username" />
+            </div>
+            <div class="login-field-block">
+              <label class="login-field-label login-field-label--saas" for="input-login-password">Mật khẩu</label>
+              <div class="login-input-wrapper">
+                <input id="input-login-password" class="input login-input login-input--saas" type="password" placeholder="••••••••" autocomplete="current-password" />
+                <button
+                  type="button"
+                  id="btn-toggle-login-password"
+                  class="login-pw-toggle"
+                  aria-label="Hiện mật khẩu"
+                  tabindex="-1"
+                  hidden
+                >
+                  <svg class="pw-eye pw-eye--open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                  <svg class="pw-eye pw-eye--closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="display:none">
+                    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <label class="login-check login-check--saas">
+              <input type="checkbox" id="check-login-remember" />
+              <span>Ghi nhớ thông tin đăng nhập</span>
+            </label>
+            <button type="submit" id="btn-login-submit" class="btn login-btn-primary login-btn-primary--saas">
+              <span class="login-btn-text">Đăng nhập</span>
+            </button>
+            <p id="login-auth-status" class="login-status login-status--saas" role="status"></p>
+          </form>
+
+          <details class="login-advanced" id="login-advanced-details">
+            <summary class="login-advanced-summary" id="login-advanced-summary">Advanced</summary>
+            <div class="login-advanced-body">
+              <div class="login-field-block">
+                <label class="login-field-label login-field-label--saas" for="input-login-base-url">API URL</label>
+                <input id="input-login-base-url" class="input login-input login-input--saas" type="url" autocomplete="url" />
+              </div>
+              <div class="login-field-block">
+                <label class="login-field-label login-field-label--saas" for="input-login-api-token">Desktop API token</label>
+                <div class="login-token-row login-token-row--saas">
+                  <input id="input-login-api-token" class="input login-input login-input--saas" type="password" placeholder="Dán token…" autocomplete="off" />
+                  <button type="button" id="btn-toggle-login-api-token" class="icon-btn login-token-toggle" title="Hiện / ẩn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <button type="button" id="btn-login-token-only" class="btn login-btn-secondary login-btn-secondary--saas">Tiếp tục với token</button>
+            </div>
+          </details>
+
+          <p class="login-footer-note">Bạn gặp vấn đề? Liên hệ hỗ trợ</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ OVERLAY VIEW — SaaS shell ═══════════════════ -->
+  <div id="overlay-view" class="view app-shell">
+    <aside class="app-sidebar">
+      <div class="sidebar-brand" data-tauri-drag-region>
+        <img src="assets/logo.png" alt="HanoiLink" class="sidebar-logo" />
+        <div class="sidebar-brand-text">
+          <span class="sidebar-brand-name">HanoiLink</span>
+          <span class="sidebar-brand-sub">HaLin AI</span>
+        </div>
+      </div>
+
+      <div class="sidebar-transcript-tools dock-toolbar" id="dock-toolbar" role="toolbar" aria-label="Công cụ transcript">
+        <button id="btn-tts" class="dock-tool-btn header-tool-btn" type="button" title="Đọc TTS (Ctrl+T)">
+          <span class="dock-tool-icon" aria-hidden="true">
+            <svg id="icon-tts-off" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              <line x1="9" y1="10" x2="15" y2="10" />
+            </svg>
+            <svg id="icon-tts-on" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              <path d="M9 10h2M13 8v4M15 10h1" />
+            </svg>
+          </span>
+          <span class="dock-tool-label">Đọc TTS</span>
+        </button>
+        <button id="btn-clear" class="dock-tool-btn header-tool-btn" type="button" title="Xóa transcript hiển thị">
+          <span class="dock-tool-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            </svg>
+          </span>
+          <span class="dock-tool-label">Xóa hiển thị</span>
+        </button>
+        <button id="btn-copy" class="dock-tool-btn header-tool-btn" type="button" title="Sao chép">
+          <span class="dock-tool-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+          </span>
+          <span class="dock-tool-label">Sao chép</span>
+        </button>
+        <button id="btn-open-transcripts" class="dock-tool-btn header-tool-btn" type="button" title="Thư mục transcript">
+          <span class="dock-tool-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+          </span>
+          <span class="dock-tool-label">Thư mục</span>
+        </button>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="Điều hướng chính">
+        <button type="button" class="sidebar-nav-item active" id="btn-nav-live" data-sidebar-nav="live">
+          <svg class="sidebar-nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <line x1="4" y1="15" x2="4" y2="9" />
+            <line x1="8" y1="17" x2="8" y2="7" />
+            <line x1="12" y1="19" x2="12" y2="5" />
+            <line x1="16" y1="17" x2="16" y2="7" />
+            <line x1="20" y1="15" x2="20" y2="9" />
+          </svg>
+          <span>Buổi học</span>
+        </button>
+        <button type="button" class="sidebar-nav-item" id="btn-nav-transcript" data-sidebar-nav="transcript">
+          <svg class="sidebar-nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <span>Lịch sử</span>
+        </button>
+        <button type="button" class="sidebar-nav-item sidebar-nav-item--settings" id="btn-nav-settings" data-sidebar-nav="settings">
+          <svg class="sidebar-nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+          <span>Cài đặt</span>
+          <span id="settings-badge" class="settings-badge sidebar-settings-badge" style="display:none" aria-hidden="true"></span>
+        </button>
+
+        <button type="button" id="btn-sidebar-logout" class="sidebar-nav-item sidebar-nav-item--logout" title="Đăng xuất">
+          <svg class="sidebar-nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          <span>Đăng xuất</span>
+        </button>
+      </nav>
+    </aside>
+
+    <div class="app-main-column">
+      <header id="drag-region" class="app-header app-topbar" data-component="TopBar">
+        <div class="topbar-left" data-region="brand-session">
+          <div class="topbar-session-info topbar-session-info--user-only">
+            <span id="header-user-name" class="header-user-name">—</span>
+          </div>
+        </div>
+        <div class="topbar-center" data-tauri-drag-region>
+          <div id="header-status-pill" class="status-pill status-pill--idle">
+            <span id="status-indicator" class="status-dot disconnected"></span>
+            <span id="status-text" class="status-text">Sẵn sàng</span>
+          </div>
+          <span id="session-timer" class="session-timer">00:00:00</span>
+        </div>
+        <div class="topbar-actions">
+          <div class="audio-source-select" id="audio-source-select">
+            <button
+              type="button"
+              id="btn-audio-source-current"
+              class="btn btn--ghost btn--sm audio-source-btn"
+              data-current="system"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-controls="audio-source-dropdown"
+              title="Nguồn âm thanh (Ctrl+1 / 2 / 3)"
+            >
+              <span class="audio-source-glyphs" aria-hidden="true">
+                <svg class="audio-source-glyph audio-source-glyph--system" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+                </svg>
+                <svg class="audio-source-glyph audio-source-glyph--microphone" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                  <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+                <svg class="audio-source-glyph audio-source-glyph--both" width="16" height="16" viewBox="0 0 28 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="9 6 5 9 2 9 2 15 5 15 9 18 9 6" />
+                  <path d="M12.5 9.5a3 3 0 0 1 0 5" />
+                  <path d="M20 4a2.5 2.5 0 0 0-2.5 2.5v5a2.5 2.5 0 0 0 5 0v-5A2.5 2.5 0 0 0 20 4z" />
+                  <path d="M25 10v1.5a5 5 0 0 1-10 0V10" />
+                </svg>
+              </span>
+              <span id="audio-source-label" class="audio-source-label">Hệ thống</span>
+              <svg class="audio-source-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            <div id="audio-source-dropdown" class="audio-source-dropdown" role="listbox" hidden>
+              <button type="button" class="audio-source-option" role="option" data-source="system" data-shortcut="Ctrl+1">
+                <span class="audio-source-option-label">Hệ thống</span>
+                <span class="audio-source-option-hint">Âm thanh máy</span>
+              </button>
+              <button type="button" class="audio-source-option" role="option" data-source="microphone" data-shortcut="Ctrl+2">
+                <span class="audio-source-option-label">Mic</span>
+                <span class="audio-source-option-hint">Chỉ micro</span>
+              </button>
+              <button type="button" class="audio-source-option" role="option" data-source="both" data-shortcut="Ctrl+3">
+                <span class="audio-source-option-label">Cả hai</span>
+                <span class="audio-source-option-hint">Hệ thống + Mic</span>
+              </button>
+            </div>
+          </div>
+
+          <button id="btn-start" class="btn btn--primary btn-start-cta topbar-primary" type="button" disabled title="Hoàn tất thiết lập buổi học trên sidebar hoặc tắt HaLin Phân Tích">
+            <svg id="icon-play" class="btn-start-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            <svg id="icon-stop" class="btn-start-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display:none" aria-hidden="true">
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+            </svg>
+            <span id="btn-start-label" class="btn-start-label">Bắt đầu</span>
+          </button>
+
+          <button
+            type="button"
+            id="btn-halin"
+            class="halin-badge"
+            title="Gửi dữ liệu buổi học lên để HaLin phân tích"
+            aria-pressed="false"
+          >
+            <span class="halin-badge-dot" aria-hidden="true"></span>
+            <span class="halin-badge-label">HaLin Phân Tích</span>
+          </button>
+
+          <div class="topbar-divider" aria-hidden="true"></div>
+
+          <div class="topbar-meta">
+            <button id="btn-pin" class="header-tool-btn topbar-meta-desktop" type="button" title="Ghim cửa sổ (Ctrl+P)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 17v5" />
+                <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76z" />
+              </svg>
+            </button>
+            <div class="topbar-overflow-wrap">
+              <button type="button" id="btn-topbar-overflow" class="header-tool-btn topbar-overflow-trigger" aria-expanded="false" aria-haspopup="true" aria-controls="topbar-overflow-menu" title="Thêm thao tác">⋯</button>
+              <div id="topbar-overflow-menu" class="topbar-overflow-menu" role="menu" hidden>
+                <button type="button" class="topbar-overflow-item" role="menuitem" data-mirror="btn-tts">Đọc TTS</button>
+                <button type="button" class="topbar-overflow-item" role="menuitem" data-mirror="btn-clear">Xóa hiển thị</button>
+                <button type="button" class="topbar-overflow-item" role="menuitem" data-mirror="btn-copy">Sao chép</button>
+                <button type="button" class="topbar-overflow-item" role="menuitem" data-mirror="btn-open-transcripts">Thư mục transcript</button>
+                <button type="button" class="topbar-overflow-item" role="menuitem" data-mirror="btn-nav-settings">Cài đặt</button>
+                <button type="button" class="topbar-overflow-item" role="menuitem" data-mirror="btn-pin">Ghim cửa sổ</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="topbar-window-controls" data-component="WindowControls">
+            <button id="btn-maximize" class="header-tool-btn" type="button" title="Phóng to / khôi phục">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="5" y="5" width="14" height="14" rx="2" />
+              </svg>
+            </button>
+            <button id="btn-minimize" class="header-tool-btn" type="button" title="Thu nhỏ">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+            <button id="btn-close" class="header-tool-btn header-tool-btn--close" type="button" title="Đóng">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div class="app-body">
+        <!-- ══ Session Setup Card — hiện mặc định trước khi bắt đầu ══ -->
+        <div id="session-setup-card" class="session-setup-card" role="region" aria-label="Thiết lập buổi học">
+          <div class="ssc-header">
+            <div class="ssc-icon" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+              </svg>
+            </div>
+            <div>
+              <h2 class="ssc-title">Thiết lập buổi học</h2>
+              <p class="ssc-subtitle">Điền thông tin và lưu trước khi bắt đầu ghi nhận</p>
+            </div>
+          </div>
+
+          <div class="ssc-body ssc-grid">
+            <div class="ssc-row ssc-span-2">
+              <div class="ssc-field">
+                <label class="ssc-label" for="ssc-lesson-type">Loại bài</label>
+                <select id="ssc-lesson-type" class="ssc-select">
+                  <option value="conversation">💬 Hội thoại</option>
+                  <option value="grammar">📝 Ngữ pháp</option>
+                  <option value="kanji">漢 Kanji</option>
+                  <option value="listening">🎧 Nghe</option>
+                  <option value="reading">📖 Đọc</option>
+                  <option value="mixed" selected>🔀 Hỗn hợp</option>
+                </select>
+              </div>
+              <div class="ssc-field">
+                <label class="ssc-label" for="ssc-level">Trình độ</label>
+                <select id="ssc-level" class="ssc-select">
+                  <option value="N5">N5</option>
+                  <option value="N4" selected>N4</option>
+                  <option value="N3">N3</option>
+                  <option value="N2">N2</option>
+                  <option value="N1">N1</option>
+                  <option value="A1">A1</option>
+                  <option value="A2">A2</option>
+                  <option value="B1">B1</option>
+                  <option value="B2">B2</option>
+                  <option value="C1">C1</option>
+                  <option value="other">Khác</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="ssc-field ssc-span-2">
+              <label class="ssc-label" for="ssc-topic">
+                Chủ đề buổi học
+                <span class="ssc-required" id="ssc-topic-hint"></span>
+              </label>
+              <input
+                type="text"
+                id="ssc-topic"
+                class="ssc-input"
+                placeholder="Ví dụ: Học bài 35 — て形 conjugation"
+                autocomplete="off"
+                maxlength="200"
+              />
+            </div>
+
+          <div class="ssc-field ssc-span-2">
+            <label class="ssc-label" id="ssc-expected-label">Cách thức dạy &amp; tương tác</label>
+            <div class="ssc-radio-grid" role="radiogroup" aria-labelledby="ssc-expected-label">
+              <label class="ssc-radio-card"><input type="radio" name="ssc-expected-mode" value="qa" checked /><span>Hỏi &amp; đáp</span></label>
+              <label class="ssc-radio-card"><input type="radio" name="ssc-expected-mode" value="drill" /><span>Drill / luyện tập</span></label>
+              <label class="ssc-radio-card"><input type="radio" name="ssc-expected-mode" value="roleplay" /><span>Đóng vai</span></label>
+              <label class="ssc-radio-card"><input type="radio" name="ssc-expected-mode" value="lecture" /><span>Bài giảng</span></label>
+            </div>
+          </div>
+
+          <div class="ssc-field">
+            <label class="ssc-label" for="ssc-scheduled-start">Giờ bắt đầu dự kiến</label>
+            <input type="datetime-local" id="ssc-scheduled-start" class="ssc-input" />
+          </div>
+
+          <div class="ssc-field">
+            <label class="ssc-label" for="ssc-total-students">Số HV đăng ký</label>
+            <input type="number" id="ssc-total-students" class="ssc-input" min="1" max="50" placeholder="Để trống nếu không biết" />
+          </div>
+
+          <div class="ssc-field">
+            <label class="ssc-label" for="ssc-lesson-plan-vocab">Từ vựng mục tiêu</label>
+            <textarea id="ssc-lesson-plan-vocab" class="ssc-textarea" rows="2" placeholder="Từ vựng mục tiêu, cách nhau bằng dấu phẩy: いただく, 遠慮する"></textarea>
+          </div>
+
+          <div class="ssc-field">
+            <label class="ssc-label" for="ssc-lesson-plan-grammar">Ngữ pháp mục tiêu</label>
+            <textarea id="ssc-lesson-plan-grammar" class="ssc-textarea" rows="2" placeholder="Ngữ pháp mục tiêu, cách nhau bằng dấu phẩy: 〜ていただけませんか"></textarea>
+          </div>
+
+          </div>
+
+          <div class="ssc-footer">
+            <div class="ssc-status" id="ssc-status" aria-live="polite"></div>
+            <button type="button" id="btn-ssc-save" class="btn btn--primary ssc-save-btn">Lưu thiết lập</button>
+          </div>
+        </div>
+
+        <div id="transcript-container">
+          <div id="transcript-content">
+            <div class="transcript-placeholder transcript-placeholder--minimal" aria-hidden="true"></div>
+          </div>
+
+          <div id="session-result-card" class="session-result-card hidden" role="dialog" aria-labelledby="result-card-title-text" aria-modal="true">
+            <div class="result-card-header">
+              <svg class="result-card-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <div class="result-card-head-text">
+                <div id="result-card-title-text" class="result-card-title">Buổi học đã hoàn thành</div>
+                <div id="result-card-time" class="result-card-sub">—</div>
+              </div>
+              <button type="button" id="btn-result-dismiss" class="btn btn--icon btn--ghost result-dismiss" title="Đóng">✕</button>
+            </div>
+            <div class="result-card-score">
+              <div class="result-score-ring" id="result-score-ring">
+                <svg viewBox="0 0 80 80" aria-hidden="true">
+                  <circle class="ring-bg" cx="40" cy="40" r="34" />
+                  <circle class="ring-fill" id="ring-fill" cx="40" cy="40" r="34" />
+                </svg>
+                <span class="result-score-value" id="result-score-value">—</span>
+                <span class="result-score-max">/100</span>
+              </div>
+              <div class="result-score-meta">
+                <div class="result-meta-item">
+                  <span class="result-meta-label">Issues phát hiện</span>
+                  <span class="result-meta-value" id="result-issues-count">—</span>
+                </div>
+                <div class="result-meta-item">
+                  <span class="result-meta-label">Thời lượng</span>
+                  <span class="result-meta-value" id="result-duration">—</span>
+                </div>
+              </div>
+            </div>
+            <div class="result-card-actions">
+              <button type="button" id="btn-result-dashboard" class="btn btn--primary">Xem chi tiết trên Dashboard</button>
+              <button type="button" id="btn-result-new-session" class="btn btn--secondary">Buổi học mới</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="floating-controls">
+          <div class="font-controls">
+            <button id="btn-font-down" class="float-btn" type="button" title="Giảm cỡ chữ">A−</button>
+            <span id="font-size-display" class="font-size-label">16</span>
+            <button id="btn-font-up" class="float-btn" type="button" title="Tăng cỡ chữ">A+</button>
+          </div>
+          <div class="color-controls">
+            <button type="button" class="color-dot active" data-color="#0f172a" title="Chữ đen chì" style="background:#0f172a;"></button>
+            <button type="button" class="color-dot" data-color="#b45309" title="Hổ phách" style="background:#b45309;"></button>
+            <button type="button" class="color-dot" data-color="#0369a1" title="Xanh dương" style="background:#0369a1;"></button>
+          </div>
+          <button id="btn-view-mode" class="float-btn" type="button" title="Một / hai cột">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="18" rx="1" />
+              <rect x="14" y="3" width="7" height="18" rx="1" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <footer id="app-footer-dock" class="app-footer-dock" aria-label="Trạng thái buổi học">
+        <div class="dock-audio-status" id="dock-audio-status">
+          <svg class="dock-audio-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+          </svg>
+          <div class="dock-audio-bars" id="dock-audio-bars" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <span id="dock-audio-label" class="dock-status-label">Hệ thống</span>
+        </div>
+
+        <div class="dock-session-center" aria-label="Chủ đề, loại bài và trình độ">
+          <span id="header-session-name" class="header-session-name dock-session-topic">Buổi học</span>
+          <span id="dock-lesson-type" class="dock-ctx-chip">—</span>
+          <span id="dock-level" class="dock-ctx-chip">—</span>
+        </div>
+
+        <div class="dock-footer-right">
+          <!-- Network status indicator (hidden by default; JS toggle) -->
+          <div
+            id="dock-net-status"
+            class="dock-net-status"
+            role="status"
+            aria-live="assertive"
+            aria-label="Trạng thái mạng"
+            hidden
+          >
+            <span class="dock-net-dot" aria-hidden="true"></span>
+            <span class="dock-net-label">Mất mạng</span>
+          </div>
+
+          <button
+            type="button"
+            id="btn-halin-recover"
+            class="btn btn--secondary btn--sm dock-recover-btn"
+            hidden
+            title="Khôi phục phiên chưa hoàn tất trên HaLin"
+          >
+            ↩ Khôi phục
+          </button>
+        </div>
+      </footer>
+
+      <div id="resize-handle"></div>
+    </div>
+  </div>
+
+  <div id="toast-stack" class="toast-stack" aria-live="polite" aria-relevant="additions text"></div>
+
+  <div id="session-result-toast" class="toast hidden" role="status" aria-live="polite">
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div id="session-result-title" style="font-weight:600;">Kết quả buổi học</div>
+      <div id="session-result-body"></div>
+      <a href="#" id="session-result-link" style="color:inherit;text-decoration:underline;">Xem chi tiết trên Dashboard</a>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ SETTINGS VIEW ═══════════════════ -->
+  <div id="settings-view" class="view">
+    <!-- Không dùng data-tauri-drag-region ở đây: trên Windows double-click vùng drag có thể thu/phóng cửa sổ trong khi màn này không có nút phóng to (overlay đang ẩn). Kéo cửa sổ = mousedown + startDragging() trong app.js -->
+    <div id="settings-drag">
+      <div class="settings-header">
+        <button id="btn-back" class="icon-btn" title="Quay lại">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+        </button>
+        <h2>Cài đặt</h2>
+        <button id="btn-save-settings-top" type="button" class="icon-btn save-btn-top btn-settings-save" title="Lưu và đóng">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </button>
+        <div class="topbar-window-controls settings-window-controls" data-component="WindowControls">
+          <button id="btn-settings-maximize" class="header-tool-btn" type="button" title="Phóng to / khôi phục">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="5" y="5" width="14" height="14" rx="2" />
+            </svg>
+          </button>
+          <button id="btn-settings-minimize" class="header-tool-btn" type="button" title="Thu nhỏ">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+          <button id="btn-settings-close" class="header-tool-btn header-tool-btn--close" type="button" title="Đóng">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-body">
+      <!-- Tab Bar -->
+      <div class="settings-tabs">
+        <button type="button" class="settings-tab active" data-tab="tab-general">Chung</button>
+        <button type="button" class="settings-tab" data-tab="tab-audio">Âm thanh</button>
+        <button type="button" class="settings-tab" data-tab="tab-extra">Thêm</button>
+      </div>
+
+      <!-- Tab: Chung — kết nối, ngôn ngữ, giao diện -->
+      <div class="settings-tab-content active" id="tab-general">
+        <div id="settings-connection-card" class="settings-connection-card">
+          <span id="settings-connection-dot" class="settings-connection-dot" aria-hidden="true"></span>
+          <div class="settings-connection-text">
+            <div id="settings-connection-title" class="settings-connection-title">HaLin AI</div>
+            <div id="settings-connection-sub" class="settings-connection-sub">Đang kiểm tra kết nối…</div>
+          </div>
+        </div>
+
+        <div class="settings-section" id="section-halin-server">
+          <div class="settings-section-header">
+            <svg class="settings-section-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="2" y1="12" x2="22" y2="12" />
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+            </svg>
+            <span>Máy chủ HaLin</span>
+          </div>
+          <div class="field">
+            <span class="field-label">URL máy chủ</span>
+            <input
+              id="input-halin-base-url"
+              class="input saas-input"
+              type="url"
+              placeholder="https://…"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+
+        <div class="settings-section" id="section-api-key">
+          <div class="settings-section-header">
+            <svg class="settings-section-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+            </svg>
+            <span>STT đám mây (Soniox)</span>
+          </div>
+          <p class="hint">Ứng dụng <strong>không</strong> lưu khóa Soniox. STT/dịch qua chế độ ☁️ do <strong>máy chủ HaLin</strong> cấu hình (<code>HALIN_STT_PROVIDER</code>, <code>HALIN_SONIOX_API_KEY</code>). Bạn chỉ cần đăng nhập HaLin (JWT hoặc Desktop API token).</p>
+          <p class="hint">Quản trị Soniox: <a href="#" id="link-soniox">console.soniox.com</a></p>
+        </div>
+
+        <div class="settings-section" id="section-languages">
+          <div class="settings-section-header">
+            <svg class="settings-section-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="2" y1="12" x2="22" y2="12" />
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+            </svg>
+            <span>Ngôn ngữ &amp; phiên dịch</span>
+          </div>
+          <!-- Translation Type -->
+          <div style="margin-bottom: 10px;">
+            <span class="field-label">Kiểu phiên dịch</span>
+            <select id="select-translation-type">
+              <option value="one_way">Một chiều → dịch hết sang ngôn ngữ đích</option>
+              <option value="two_way">Hai chiều ↔ dịch qua lại giữa hai ngôn ngữ</option>
+            </select>
+          </div>
+
+          <!-- One-way: Source + Target -->
+          <div id="section-oneway-langs" class="field-row">
+            <div class="field">
+              <span class="field-label">Nguồn</span>
+              <select id="select-source-lang">
+                <option value="auto">Tự nhận diện</option>
+                <optgroup label="Phổ biến">
+                  <option value="en">English</option>
+                  <option value="ja">Japanese</option>
+                  <option value="ko">Korean</option>
+                  <option value="zh">Chinese</option>
+                  <option value="vi">Vietnamese</option>
+                  <option value="fr">French</option>
+                  <option value="de">German</option>
+                  <option value="es">Spanish</option>
+                  <option value="th">Thai</option>
+                  <option value="id">Indonesian</option>
+                </optgroup>
+                <optgroup label="Tất cả ngôn ngữ">
+                  <option value="af">Afrikaans</option>
+                  <option value="sq">Albanian</option>
+                  <option value="ar">Arabic</option>
+                  <option value="az">Azerbaijani</option>
+                  <option value="eu">Basque</option>
+                  <option value="be">Belarusian</option>
+                  <option value="bn">Bengali</option>
+                  <option value="bs">Bosnian</option>
+                  <option value="bg">Bulgarian</option>
+                  <option value="ca">Catalan</option>
+                  <option value="hr">Croatian</option>
+                  <option value="cs">Czech</option>
+                  <option value="da">Danish</option>
+                  <option value="nl">Dutch</option>
+                  <option value="et">Estonian</option>
+                  <option value="fi">Finnish</option>
+                  <option value="gl">Galician</option>
+                  <option value="el">Greek</option>
+                  <option value="gu">Gujarati</option>
+                  <option value="he">Hebrew</option>
+                  <option value="hi">Hindi</option>
+                  <option value="hu">Hungarian</option>
+                  <option value="it">Italian</option>
+                  <option value="kn">Kannada</option>
+                  <option value="kk">Kazakh</option>
+                  <option value="lv">Latvian</option>
+                  <option value="lt">Lithuanian</option>
+                  <option value="mk">Macedonian</option>
+                  <option value="ms">Malay</option>
+                  <option value="ml">Malayalam</option>
+                  <option value="mr">Marathi</option>
+                  <option value="no">Norwegian</option>
+                  <option value="fa">Persian</option>
+                  <option value="pl">Polish</option>
+                  <option value="pt">Portuguese</option>
+                  <option value="pa">Punjabi</option>
+                  <option value="ro">Romanian</option>
+                  <option value="ru">Russian</option>
+                  <option value="sr">Serbian</option>
+                  <option value="sk">Slovak</option>
+                  <option value="sl">Slovenian</option>
+                  <option value="sw">Swahili</option>
+                  <option value="sv">Swedish</option>
+                  <option value="tl">Tagalog</option>
+                  <option value="ta">Tamil</option>
+                  <option value="te">Telugu</option>
+                  <option value="tr">Turkish</option>
+                  <option value="uk">Ukrainian</option>
+                  <option value="ur">Urdu</option>
+                  <option value="cy">Welsh</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="field">
+              <span class="field-label">Đích</span>
+              <select id="select-target-lang">
+                <optgroup label="Phổ biến">
+                  <option value="vi">Vietnamese</option>
+                  <option value="en">English</option>
+                  <option value="ja">Japanese</option>
+                  <option value="ko">Korean</option>
+                  <option value="zh">Chinese</option>
+                  <option value="fr">French</option>
+                  <option value="de">German</option>
+                  <option value="es">Spanish</option>
+                  <option value="th">Thai</option>
+                  <option value="id">Indonesian</option>
+                </optgroup>
+                <optgroup label="Tất cả ngôn ngữ">
+                  <option value="af">Afrikaans</option>
+                  <option value="sq">Albanian</option>
+                  <option value="ar">Arabic</option>
+                  <option value="az">Azerbaijani</option>
+                  <option value="eu">Basque</option>
+                  <option value="be">Belarusian</option>
+                  <option value="bn">Bengali</option>
+                  <option value="bs">Bosnian</option>
+                  <option value="bg">Bulgarian</option>
+                  <option value="ca">Catalan</option>
+                  <option value="hr">Croatian</option>
+                  <option value="cs">Czech</option>
+                  <option value="da">Danish</option>
+                  <option value="nl">Dutch</option>
+                  <option value="et">Estonian</option>
+                  <option value="fi">Finnish</option>
+                  <option value="gl">Galician</option>
+                  <option value="el">Greek</option>
+                  <option value="gu">Gujarati</option>
+                  <option value="he">Hebrew</option>
+                  <option value="hi">Hindi</option>
+                  <option value="hu">Hungarian</option>
+                  <option value="it">Italian</option>
+                  <option value="kn">Kannada</option>
+                  <option value="kk">Kazakh</option>
+                  <option value="lv">Latvian</option>
+                  <option value="lt">Lithuanian</option>
+                  <option value="mk">Macedonian</option>
+                  <option value="ms">Malay</option>
+                  <option value="ml">Malayalam</option>
+                  <option value="mr">Marathi</option>
+                  <option value="no">Norwegian</option>
+                  <option value="fa">Persian</option>
+                  <option value="pl">Polish</option>
+                  <option value="pt">Portuguese</option>
+                  <option value="pa">Punjabi</option>
+                  <option value="ro">Romanian</option>
+                  <option value="ru">Russian</option>
+                  <option value="sr">Serbian</option>
+                  <option value="sk">Slovak</option>
+                  <option value="sl">Slovenian</option>
+                  <option value="sw">Swahili</option>
+                  <option value="sv">Swedish</option>
+                  <option value="tl">Tagalog</option>
+                  <option value="ta">Tamil</option>
+                  <option value="te">Telugu</option>
+                  <option value="tr">Turkish</option>
+                  <option value="uk">Ukrainian</option>
+                  <option value="ur">Urdu</option>
+                  <option value="cy">Welsh</option>
+                </optgroup>
+              </select>
+            </div>
+          </div>
+
+          <!-- Two-way: Language A + Language B -->
+          <div id="section-twoway-langs" class="field-row" style="display:none;">
+            <div class="field">
+              <span class="field-label">Ngôn ngữ A</span>
+              <select id="select-lang-a">
+                <optgroup label="Phổ biến">
+                  <option value="ja">Japanese</option>
+                  <option value="en">English</option>
+                  <option value="ko">Korean</option>
+                  <option value="zh">Chinese</option>
+                  <option value="vi">Vietnamese</option>
+                  <option value="fr">French</option>
+                  <option value="de">German</option>
+                  <option value="es">Spanish</option>
+                  <option value="th">Thai</option>
+                  <option value="id">Indonesian</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="field">
+              <span class="field-label">Ngôn ngữ B</span>
+              <select id="select-lang-b">
+                <optgroup label="Phổ biến">
+                  <option value="vi">Vietnamese</option>
+                  <option value="en">English</option>
+                  <option value="ja">Japanese</option>
+                  <option value="ko">Korean</option>
+                  <option value="zh">Chinese</option>
+                  <option value="fr">French</option>
+                  <option value="de">German</option>
+                  <option value="es">Spanish</option>
+                  <option value="th">Thai</option>
+                  <option value="id">Indonesian</option>
+                </optgroup>
+              </select>
+            </div>
+          </div>
+          <p class="hint" id="hint-twoway" style="display:none;">Giọng A → dịch sang B và ngược lại. Ngôn ngữ khác chỉ ghi âm, không dịch.</p>
+
+          <!-- Strict Language Detection -->
+          <label class="checkbox-option" id="section-strict-lang" style="margin-top: 8px;">
+            <input type="checkbox" id="check-strict-lang" />
+            <span class="checkbox-label">Nhận diện ngôn ngữ chặt <span class="hint-dim">(giảm nhận nhầm ngôn ngữ)</span></span>
+          </label>
+
+          <!-- Endpoint Delay -->
+          <div class="slider-field" id="section-endpoint-delay" style="margin-top: 12px;">
+            <span class="field-label" title="Thời gian chờ sau khi ngừng nói trước khi dịch">Độ trễ endpoint</span>
+            <input type="range" id="range-endpoint-delay" min="500" max="3000" step="100" value="3000" />
+            <span id="endpoint-delay-value" class="range-value">3.0s</span>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <svg class="settings-section-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+            <span>Giao diện hiển thị</span>
+          </div>
+          <div class="slider-field">
+            <span class="field-label">Độ mờ cửa sổ</span>
+            <input type="range" id="range-opacity" min="20" max="100" value="85" />
+            <span id="opacity-value" class="range-value">85%</span>
+          </div>
+          <div class="slider-field">
+            <span class="field-label">Cỡ chữ</span>
+            <input type="range" id="range-font-size" min="12" max="140" value="16" />
+            <span id="font-size-value" class="range-value">16px</span>
+          </div>
+          <div class="slider-field">
+            <span class="field-label">Số dòng tối đa</span>
+            <input type="range" id="range-max-lines" min="2" max="15" value="5" />
+            <span id="max-lines-value" class="range-value">5</span>
+          </div>
+          <label class="checkbox-option" style="margin-top: 8px;">
+            <input type="checkbox" id="check-show-original" checked />
+            <span class="checkbox-label">Hiển thị văn bản gốc</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Tab: Âm thanh -->
+      <div class="settings-tab-content" id="tab-audio">
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <svg class="settings-section-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="23" />
+              <line x1="8" y1="23" x2="16" y2="23" />
+            </svg>
+            <span>Nguồn âm thanh</span>
+          </div>
+          <div class="radio-group" id="audio-source-group">
+            <label class="radio-option"><input type="radio" name="audio-source" value="system" checked /><span class="radio-label">Hệ thống</span></label>
+            <label class="radio-option"><input type="radio" name="audio-source" value="microphone" /><span class="radio-label">Mic</span></label>
+            <label class="radio-option"><input type="radio" name="audio-source" value="both" /><span class="radio-label">Cả hai</span></label>
+          </div>
+          <p class="hint">Hệ thống: âm từ ứng dụng/video. Mic: giọng giảng viên. Cả hai: gộp hai nguồn.</p>
+        </div>
+      </div>
+
+      <!-- Tab: Thêm — HaLin trạng thái / debug, TTS & giới thiệu -->
+      <div class="settings-tab-content settings-tab-extra" id="tab-extra">
+        <div id="section-halin" data-component="SessionForm">
+          <div class="settings-section-header settings-section-header--block-start">
+            <svg class="settings-section-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </svg>
+            <span>Trạng thái hệ thống</span>
+          </div>
+          <div class="settings-section status-panel-readonly" data-component="StatusPanel">
+            <p class="hint halin-status-hint">Chỉ đọc — cập nhật khi buổi học chạy.</p>
+            <div class="status-panel-grid">
+              <div class="status-panel-item">
+                <span class="status-panel-label">Backend STT</span>
+                <span id="halin-backend-stt-status" class="status-panel-value">Nhàn rỗi</span>
+              </div>
+              <div class="status-panel-item">
+                <span class="status-panel-label">Hàng đợi gửi</span>
+                <span id="halin-queue-status" class="status-panel-value">pending=0, lastAcked=—</span>
+              </div>
+              <div class="status-panel-item status-panel-item--wide">
+                <span class="status-panel-label">Lỗi gần nhất</span>
+                <span id="halin-last-error" class="status-panel-value status-panel-value--error">—</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section settings-section--halin-debug">
+            <details class="halin-dev-details">
+              <summary class="halin-dev-summary">Nâng cao / Debug</summary>
+              <div class="halin-dev-body">
+                <p class="hint halin-dev-hint">Độ dài chunk, token Desktop API và Job ID — dùng khi quản trị cấp token hoặc gỡ lỗi.</p>
+                <div class="saas-field">
+                  <label for="input-halin-chunk-seconds">Độ dài chunk (giây)</label>
+                  <input id="input-halin-chunk-seconds" class="input saas-input" type="number" min="2" max="10" step="1" value="5" />
+                </div>
+                <span class="field-label halin-dev-token-label">Token Desktop API</span>
+                <div class="input-group-inline">
+                  <input type="password" id="input-halin-api-token" class="input saas-input" placeholder="Bearer token (opaque)…" autocomplete="off" />
+                  <button id="btn-toggle-halin-token" class="icon-btn small" type="button" title="Hiện / ẩn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                </div>
+                <p class="hint">Dùng khi quản trị cấp token Desktop API (Bearer) thay vì đăng nhập email.</p>
+                <div class="settings-kv-list halin-dev-kv">
+                  <div class="settings-kv-row">
+                    <span class="settings-kv-label">Job ID</span>
+                    <span id="halin-job-id" class="settings-kv-value">—</span>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <div class="settings-section-header settings-section-header--block-mid">
+          <svg class="settings-section-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+          </svg>
+          <span>Đọc thành tiếng (TTS)</span>
+        </div>
+        <div class="settings-section">
+          <span class="field-label">Nhà cung cấp</span>
+          <select id="select-tts-provider">
+            <option value="edge">🎙️ Edge TTS — miễn phí</option>
+            <option value="google">🌐 Google Chirp 3 HD — trả phí</option>
+            <option value="elevenlabs">✨ ElevenLabs — trả phí</option>
+          </select>
+          <p class="hint" id="tts-provider-hint">Miễn phí, giọng tự nhiên — không cần API key</p>
+        </div>
+
+        <!-- Edge TTS settings -->
+        <div class="settings-section" id="tts-edge-settings">
+          <div class="field">
+            <span class="field-label">Giọng</span>
+            <select id="select-edge-voice">
+              <option value="vi-VN-HoaiMyNeural">HoaiMy — Nữ 🇻🇳</option>
+              <option value="vi-VN-NamMinhNeural">NamMinh — Nam 🇻🇳</option>
+              <option value="en-US-JennyNeural">Jenny — Female 🇺🇸</option>
+              <option value="en-US-GuyNeural">Guy — Male 🇺🇸</option>
+              <option value="ja-JP-NanamiNeural">Nanami — 女性 🇯🇵</option>
+              <option value="ko-KR-SunHiNeural">SunHi — 여성 🇰🇷</option>
+              <option value="zh-CN-XiaoxiaoNeural">Xiaoxiao — 女声 🇨🇳</option>
+            </select>
+          </div>
+          <div class="slider-field" style="margin-top: 8px;">
+            <span class="field-label">Tốc độ</span>
+            <input type="range" id="range-edge-speed" min="-50" max="100" step="10" />
+            <span id="edge-speed-value" class="range-value"></span>
+          </div>
+        </div>
+
+        <!-- Google TTS settings -->
+        <div class="settings-section" id="tts-google-settings" style="display:none;">
+          <span class="field-label">Khóa API Google Cloud</span>
+          <div class="input-group-inline">
+            <input type="password" id="input-google-tts-key" class="input saas-input" placeholder="AIzaSy..." autocomplete="off" />
+            <button id="btn-toggle-google-key" class="icon-btn small" title="Hiện / ẩn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
+          </div>
+          <p class="hint">console.cloud.google.com → bật Text-to-Speech API → tạo API key</p>
+          <div class="field" style="margin-top: 8px;">
+            <span class="field-label">Giọng</span>
+            <select id="select-google-voice">
+              <optgroup label="🇻🇳 Vietnamese">
+                <option value="vi-VN-Chirp3-HD-Aoede">Aoede — Nữ</option>
+                <option value="vi-VN-Chirp3-HD-Kore">Kore — Nữ</option>
+                <option value="vi-VN-Chirp3-HD-Leda">Leda — Nữ</option>
+                <option value="vi-VN-Chirp3-HD-Charon">Charon — Nam</option>
+                <option value="vi-VN-Chirp3-HD-Fenrir">Fenrir — Nam</option>
+                <option value="vi-VN-Chirp3-HD-Puck">Puck — Nam</option>
+              </optgroup>
+              <optgroup label="🇺🇸 English">
+                <option value="en-US-Chirp3-HD-Aoede">Aoede — Female</option>
+                <option value="en-US-Chirp3-HD-Kore">Kore — Female</option>
+                <option value="en-US-Chirp3-HD-Charon">Charon — Male</option>
+                <option value="en-US-Chirp3-HD-Puck">Puck — Male</option>
+              </optgroup>
+              <optgroup label="🇯🇵 Japanese">
+                <option value="ja-JP-Chirp3-HD-Aoede">Aoede — 女性</option>
+                <option value="ja-JP-Chirp3-HD-Charon">Charon — 男性</option>
+              </optgroup>
+              <optgroup label="🇰🇷 Korean">
+                <option value="ko-KR-Chirp3-HD-Aoede">Aoede — 여성</option>
+                <option value="ko-KR-Chirp3-HD-Charon">Charon — 남성</option>
+              </optgroup>
+              <optgroup label="🇨🇳 Chinese">
+                <option value="cmn-CN-Chirp3-HD-Aoede">Aoede — 女声</option>
+                <option value="cmn-CN-Chirp3-HD-Charon">Charon — 男声</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="slider-field" style="margin-top: 8px;">
+            <span class="field-label">Tốc độ</span>
+            <input type="range" id="range-google-speed" min="0.5" max="2.0" step="0.1" value="1.0" />
+            <span id="google-speed-value" class="range-value">1.0x</span>
+          </div>
+        </div>
+
+        <!-- ElevenLabs settings -->
+        <div class="settings-section" id="tts-elevenlabs-settings" style="display:none;">
+          <span class="field-label">Khóa API ElevenLabs</span>
+          <div class="input-group-inline">
+            <input type="password" id="input-elevenlabs-key" class="input saas-input" placeholder="Dán khóa API…" autocomplete="off" />
+            <button id="btn-toggle-elevenlabs-key" class="icon-btn small" title="Hiện / ẩn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
+          </div>
+          <p class="hint">elevenlabs.io — chất lượng cao cấp</p>
+          <div class="field" style="margin-top: 8px;">
+            <span class="field-label">Giọng</span>
+            <select id="select-tts-voice">
+              <option value="21m00Tcm4TlvDq8ikWAM">Rachel — Female</option>
+              <option value="EXAVITQu4vr4xnSDxMaL">Sarah — Female</option>
+              <option value="onwK4e9ZLuTAKqWW03F9">Daniel — Male</option>
+              <option value="pNInz6obpgDQGcFmaJgB">Adam — Male</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-section-header settings-section-header--block-mid">
+          <svg class="settings-section-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+            <line x1="12" y1="22.08" x2="12" y2="12" />
+          </svg>
+          <span>Ứng dụng &amp; cập nhật</span>
+        </div>
+        <div class="settings-section about-info">
+          <div class="about-app-header">
+            <span class="about-app-name">HaLin AI Platform</span>
+            <span class="about-app-version" id="about-version">v0.5.1</span>
+          </div>
+          <p class="hint">Phiên dịch thời gian thực, HaLin Classroom — Windows &amp; macOS</p>
+        </div>
+
+        <div class="settings-section" id="section-update">
+          <span class="field-label">Cập nhật</span>
+          <div id="update-status" class="update-status">
+            <span id="update-status-text">Nhấn để kiểm tra bản mới</span>
+            <button id="btn-check-update" class="btn btn--ghost btn--sm check-update-btn" title="Kiểm tra ngay">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"/>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+              </svg>
+            </button>
+          </div>
+          <div id="update-actions" style="margin-top:8px;display:none;">
+            <button id="btn-do-update" class="btn btn--primary primary-btn update-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span id="update-btn-text">Tải và cài đặt</span>
+            </button>
+          </div>
+          <div id="update-progress" class="update-progress" style="display:none;">
+            <div class="progress-bar"><div id="update-progress-fill" class="progress-fill"></div></div>
+            <span id="update-progress-pct" class="progress-pct">0%</span>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <span class="field-label">Hỗ trợ</span>
+          <button id="btn-export-debug-log" type="button" class="btn login-btn-secondary login-btn-secondary--saas" style="width:100%;">
+            Export Debug Log
+          </button>
+          <p class="hint">Dùng khi cần gửi log cho kỹ thuật để chẩn đoán lỗi.</p>
+        </div>
+      </div>
+
+      <!-- Save -->
+      <div class="settings-actions">
+        <button id="btn-save-settings" type="button" class="btn btn--primary primary-btn btn-settings-save">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span id="btn-save-settings-label">Lưu và đóng</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- ═══════════════════ SESSIONS VIEW ═══════════════════ -->
+  <div id="sessions-view" class="view">
+    <div class="sessions-header" data-tauri-drag-region>
+      <button id="btn-sessions-back" class="icon-btn" title="Quay lại">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="19" y1="12" x2="5" y2="12" />
+          <polyline points="12 19 5 12 12 5" />
+        </svg>
+      </button>
+      <span class="sessions-title">Phiên đã lưu</span>
+    </div>
+
+    <!-- Session list panel -->
+    <div id="sessions-list-panel" class="sessions-body">
+      <div id="sessions-list"></div>
+    </div>
+
+    <!-- Session viewer (shown when a session is selected) -->
+    <div id="session-viewer" class="sessions-body" style="display:none">
+      <div class="session-viewer-header">
+        <button id="btn-session-back-to-list" class="icon-btn" title="Về danh sách">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+        </button>
+        <span id="session-viewer-title" class="session-viewer-title-text"></span>
+        <button id="btn-session-copy" class="session-copy-btn" title="Sao chép">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+          Sao chép
+        </button>
+      </div>
+      <div id="session-viewer-content" class="session-content-scroll"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ HaLin login — password (in-app, không dùng window.prompt) ═══════════════════ -->
+  <div id="halin-login-password-modal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="halin-login-password-title">
+    <div class="modal-card" role="document">
+      <div class="modal-header">
+        <h3 id="halin-login-password-title">Đăng nhập HaLin</h3>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc halin-login-password-hint" id="halin-login-password-email-hint"></p>
+        <div class="field" style="margin-top: 8px;">
+          <span class="field-label">Mật khẩu</span>
+          <input type="password" id="input-halin-login-password-modal" class="input saas-input" autocomplete="current-password" />
+        </div>
+      </div>
+      <div class="modal-footer has-gap">
+        <button type="button" id="btn-halin-login-password-cancel" class="btn btn--secondary secondary-btn">Hủy</button>
+        <button type="button" id="btn-halin-login-password-ok" class="btn btn--primary btn-settings-primary">Đăng nhập</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ HaLin pending finalize (in-app) ═══════════════════ -->
+  <div id="halin-pending-finalize-modal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="halin-pending-finalize-title">
+    <div class="modal-card" role="document">
+      <div class="modal-header">
+        <h3 id="halin-pending-finalize-title">Buổi học chưa gửi dữ liệu lên HaLin</h3>
+      </div>
+      <div class="modal-body" id="halin-pending-finalize-body"></div>
+      <div class="modal-footer has-gap">
+        <button type="button" id="btn-halin-pending-cancel" class="btn btn--secondary secondary-btn">Để sau</button>
+        <button type="button" id="btn-halin-pending-confirm" class="btn btn--primary btn-settings-primary">Gửi lại dữ liệu buổi học</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ SETUP MODAL ═══════════════════ -->
+  <div id="setup-modal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="setup-modal-title">
+    <div class="modal-card" role="document">
+      <div class="modal-header">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" aria-hidden="true">
+          <path d="M12 2L2 7l10 5 10-5-10-5z" />
+          <path d="M2 17l10 5 10-5" />
+          <path d="M2 12l10 5 10-5" />
+        </svg>
+        <h3 id="setup-modal-title">Cài mô hình cục bộ</h3>
+      </div>
+
+      <div class="modal-body">
+        <p class="modal-desc">Đang tải và cài mô hình MLX để dịch ngoại tuyến. Chỉ cần thiết lập một lần.</p>
+
+        <!-- Progress bar -->
+        <div class="progress-container">
+          <div class="progress-bar">
+            <div id="setup-progress-fill" class="progress-fill"></div>
+          </div>
+          <span id="setup-progress-pct" class="progress-pct">0%</span>
+        </div>
+
+        <!-- Step indicators -->
+        <div class="setup-steps">
+          <div class="setup-step" id="step-check">
+            <span class="step-icon">⏳</span>
+            <span class="step-text">Kiểm tra Python</span>
+          </div>
+          <div class="setup-step" id="step-venv">
+            <span class="step-icon">⏳</span>
+            <span class="step-text">Tạo môi trường</span>
+          </div>
+          <div class="setup-step" id="step-packages">
+            <span class="step-icon">⏳</span>
+            <span class="step-text">Cài gói phụ thuộc</span>
+          </div>
+          <div class="setup-step" id="step-models">
+            <span class="step-icon">⏳</span>
+            <span class="step-text">Tải mô hình (~5GB)</span>
+          </div>
+        </div>
+
+        <!-- Current status -->
+        <div class="setup-status">
+          <span id="setup-status-text">Đang chuẩn bị…</span>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btn-cancel-setup" class="btn btn--secondary secondary-btn">Hủy</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/settings.js"></script>
+  <script type="module" src="/js/ui.js"></script>
+  <script type="module" src="/js/elevenlabs-tts.js"></script>
+  <script type="module" src="/js/google-tts.js"></script>
+  <script type="module" src="/js/updater.js"></script>
+  <script type="module" src="/js/audio-player.js"></script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+
+</html>
