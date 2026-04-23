@@ -53,6 +53,8 @@ jobs:
       - name: Build Tauri app (unsigned)
         env:
           TAURI_SKIP_SIGNING: true
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: npm run tauri build
 
       - name: Upload macOS artifacts
@@ -107,6 +109,8 @@ jobs:
 
       - name: Build Tauri app (Intel, unsigned)
         env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
           TAURI_SKIP_SIGNING: true
         run: npm run tauri build -- --target x86_64-apple-darwin
 
