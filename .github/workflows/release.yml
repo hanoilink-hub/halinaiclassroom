@@ -264,7 +264,10 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          # Publish ngay khi build xong — Tauri auto-updater trên máy giáo viên
+          # sẽ thấy bản mới trong vòng vài phút. Đổi lại `draft: true` nếu muốn
+          # review trước khi mở cho user.
+          draft: false
           generate_release_notes: true
           files: |
             artifacts/**/*.dmg
