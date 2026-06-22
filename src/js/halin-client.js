@@ -132,15 +132,10 @@ export async function appendAudioChunk({ baseUrl, token, jobId, chunkSeq, chunkS
   return await parseEnvelope(res);
 }
 
-export async function uploadLiveAudioWav({ baseUrl, token, jobId, wavBytes }) {
-  const base = normalizeBaseUrl(baseUrl);
-  const res = await halinFetch(`${base}/api/v1/training/jobs/${jobId}/live-audio`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'audio/wav', ...authHeaders(token) },
-    body: wavBytes,
-  }, 120000);
-  return await parseEnvelope(res);
-}
+// uploadLiveAudioWav was removed in Phase 1 of the long-session refactor.
+// The WAV is now produced as an on-disk file by `commands::session_recording`
+// (Rust) and uploaded by `upload_session_recording_to_halin`, so the JS heap
+// no longer needs to hold ~800 MB of audio for a multi-hour session.
 
 export async function finalizeLiveSession({
   baseUrl,

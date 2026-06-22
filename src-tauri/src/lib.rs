@@ -6,6 +6,7 @@ use audio::microphone::MicCapture;
 use audio::SystemAudioCapture;
 use commands::audio::AudioState;
 use commands::local_pipeline::LocalPipelineState;
+use commands::session_recording::SessionRecordingState;
 use settings::{Settings, SettingsState};
 use std::sync::Mutex;
 
@@ -42,6 +43,7 @@ pub fn run() {
         .manage(LocalPipelineState {
             process: Mutex::new(None),
         })
+        .manage(SessionRecordingState::new())
         .invoke_handler(tauri::generate_handler![
             commands::settings::get_settings,
             commands::settings::save_settings,
@@ -49,11 +51,17 @@ pub fn run() {
             commands::audio::stop_capture,
             commands::audio::check_permissions,
             commands::transcript::save_transcript,
-            commands::transcript::save_live_wav,
             commands::transcript::open_transcript_dir,
             commands::transcript::open_live_recordings_dir,
             commands::transcript::list_transcripts,
             commands::transcript::read_transcript,
+            commands::session_recording::start_session_recording,
+            commands::session_recording::finalize_session_recording,
+            commands::session_recording::discard_session_recording,
+            commands::session_recording::archive_session_recording,
+            commands::session_recording::delete_session_recording_file,
+            commands::session_recording::upload_session_recording_to_halin,
+            commands::session_recording::read_session_recording_base64,
             commands::local_pipeline::start_local_pipeline,
             commands::local_pipeline::send_audio_to_pipeline,
             commands::local_pipeline::stop_local_pipeline,

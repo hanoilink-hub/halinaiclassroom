@@ -1,4 +1,3 @@
-use base64::Engine;
 use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
@@ -18,6 +17,8 @@ fn transcript_dir(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 /// Directory for optional local copies of full-session live WAV (debug / QA).
+/// Mirrors the directory created by [`crate::commands::session_recording`] so that
+/// the "Open recordings folder" menu opens the same folder used by the archive step.
 fn live_recordings_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
@@ -27,46 +28,6 @@ fn live_recordings_dir(app: &AppHandle) -> Result<PathBuf, String> {
 
     fs::create_dir_all(&dir).map_err(|e| format!("Failed to create live_recordings dir: {}", e))?;
     Ok(dir)
-}
-
-fn sanitize_live_wav_stem(job_id: Option<&str>) -> String {
-    let t = job_id.unwrap_or("").trim();
-    if t.is_empty() {
-        return Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
-    }
-    let s: String = t
-        .chars()
-        .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
-        .collect();
-    if s.is_empty() {
-        Local::now().format("%Y-%m-%d_%H-%M-%S").to_string()
-    } else {
-        s
-    }
-}
-
-/// Save full-session live WAV bytes (base64) next to transcripts for local inspection.
-#[tauri::command]
-pub fn save_live_wav(
-    app: AppHandle,
-    wav_base64: String,
-    job_id: Option<String>,
-) -> Result<String, String> {
-    let wav_bytes = base64::engine::general_purpose::STANDARD
-        .decode(wav_base64.trim())
-        .map_err(|e| format!("Invalid WAV base64: {}", e))?;
-    if wav_bytes.len() < 44 {
-        return Err("WAV payload too small".to_string());
-    }
-
-    let dir = live_recordings_dir(&app)?;
-    let stem = sanitize_live_wav_stem(job_id.as_deref());
-    let filename = format!("{}.wav", stem);
-    let filepath = dir.join(&filename);
-
-    fs::write(&filepath, &wav_bytes).map_err(|e| format!("Failed to save live WAV: {}", e))?;
-
-    Ok(filepath.to_string_lossy().to_string())
 }
 
 /// Open the live_recordings folder (same app data root as transcripts).

@@ -3,8 +3,21 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-/// Default HaLin API base URL — keep in sync with `DEFAULT_HALIN_API_BASE_URL` in `src/js/config.js`
+/// Default HaLin API base URL.
+/// - debug build (`npm run tauri dev`): points to local backend
+/// - release build (`npm run tauri build` / GitHub Actions): points to production
+#[cfg(debug_assertions)]
+const DEFAULT_HALIN_BASE_URL: &str = "http://localhost:8000";
+
+#[cfg(not(debug_assertions))]
 const DEFAULT_HALIN_BASE_URL: &str = "https://noibo.hanoilink.edu.vn";
+
+/// Default HaLin Dashboard URL (the frontend web app).
+#[cfg(debug_assertions)]
+const DEFAULT_HALIN_DASHBOARD_URL: &str = "http://localhost:5173";
+
+#[cfg(not(debug_assertions))]
+const DEFAULT_HALIN_DASHBOARD_URL: &str = "https://noibo.hanoilink.edu.vn/dashboard";
 
 /// Translation term: source → target mapping for Soniox
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -71,6 +84,8 @@ pub struct Settings {
     pub halin_remember_password: bool,
     /// HaLin backend base URL (e.g. http://127.0.0.1:8000)
     pub halin_base_url: String,
+    /// HaLin dashboard web URL (e.g. http://localhost:5173)
+    pub halin_dashboard_url: String,
     /// HaLin desktop API token (Authorization: Bearer ...)
     pub halin_api_token: String,
     /// HaLin user email (JWT login)
@@ -116,6 +131,7 @@ impl Default for Settings {
             halin_enabled: false,
             halin_remember_password: false,
             halin_base_url: DEFAULT_HALIN_BASE_URL.to_string(),
+            halin_dashboard_url: DEFAULT_HALIN_DASHBOARD_URL.to_string(),
             halin_api_token: String::new(),
             halin_email: String::new(),
             halin_password: String::new(),

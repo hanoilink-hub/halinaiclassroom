@@ -668,17 +668,19 @@ body {
 
 /* Post-session result card (UI-4.3) — overlay trong transcript */
 .session-result-card {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(420px, calc(100% - 32px));
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  top: auto;
+  left: auto;
+  transform: none;
+  width: min(400px, calc(100% - 48px));
   background: var(--bg-secondary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
   padding: 20px;
-  z-index: 50;
+  z-index: 200;
   animation: fadeInUp 0.3s ease;
 }
 

@@ -29,6 +29,7 @@ const DEFAULT_SETTINGS = {
   halin_enabled: false,
   halin_remember_password: false,
   halin_base_url: DEFAULT_HALIN_API_BASE_URL,
+  halin_dashboard_url: 'https://noibo.hanoilink.edu.vn/dashboard',
   halin_api_token: '',
   halin_email: '',
   halin_access_token: '',

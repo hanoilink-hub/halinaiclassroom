@@ -1,5 +1,6 @@
 use crate::audio::microphone::MicCapture;
 use crate::audio::SystemAudioCapture;
+use crate::commands::session_recording::{append_pcm_frame, SessionRecordingState};
 use serde::Serialize;
 use std::sync::mpsc::{self, RecvTimeoutError, TryRecvError};
 use std::sync::Mutex;
@@ -153,15 +154,21 @@ pub struct PermissionStatus {
     pub microphone: String,
 }
 
-/// Start audio capture and forward data to the frontend via IPC channel
+/// Start audio capture and forward data to the frontend via IPC channel.
+///
+/// Also forwards PCM into the on-disk session recording when one is active
+/// (see [`crate::commands::session_recording::start_session_recording`]), so the
+/// full-session WAV never has to be accumulated in the JS heap.
 #[tauri::command]
 pub fn start_capture(
     source: String,
     channel: Channel<Vec<u8>>,
     state: State<'_, AudioState>,
+    recording: State<'_, SessionRecordingState>,
 ) -> Result<(), String> {
     // Stop any existing capture first
     stop_capture_inner(&state);
+    let recording_handle = recording.handle();
 
     let receiver: mpsc::Receiver<Vec<u8>> = match source.as_str() {
         "system" => {
@@ -197,6 +204,7 @@ pub fn start_capture(
             if stop_flag_clone.load(std::sync::atomic::Ordering::SeqCst) {
                 // Flush remaining buffer before exit
                 if !buffer.is_empty() {
+                    append_pcm_frame(&recording_handle, &buffer);
                     let _ = channel.send(buffer.clone());
                 }
                 break;
@@ -209,14 +217,17 @@ pub fn start_capture(
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
                 Err(mpsc::RecvTimeoutError::Disconnected) => {
                     if !buffer.is_empty() {
+                        append_pcm_frame(&recording_handle, &buffer);
                         let _ = channel.send(buffer.clone());
                     }
                     break;
                 }
             }
 
-            // Flush buffer every 200ms
+            // Flush buffer every 200ms — write to disk first so a channel.send failure
+            // (webview tab closed unexpectedly) does not silently drop the recording.
             if last_flush.elapsed() >= batch_interval && !buffer.is_empty() {
+                append_pcm_frame(&recording_handle, &buffer);
                 if let Err(_e) = channel.send(buffer.clone()) {
                     break; // Channel closed
                 }

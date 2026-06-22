@@ -38,6 +38,8 @@ class App {
     constructor() {
         this.isRunning = false;
         this.isStarting = false; // Guard against re-entry
+        this._sessionSetupConfirmed = false; // Must re-confirm setup after each stop
+        this._isPollingJob = false; // True while waiting for backend analysis result
         this.currentSource = 'system'; // 'system' | 'microphone' | 'both'
         this.translationMode = 'soniox'; // 'soniox' | 'local'
         this.transcriptUI = null;
@@ -68,26 +70,8 @@ class App {
                     return null;
                 }
             },
-            getLiveWavBytesForFinalize: () => {
-                try {
-                    return this._buildLiveWavBytesForFinalize?.() ?? null;
-                } catch {
-                    return null;
-                }
-            },
-            onLiveWavAfterCapture: async (wavBytes, { jobId }) => {
-                try {
-                    const b64 = this._uint8ArrayToBase64(wavBytes);
-                    const path = await invoke('save_live_wav', {
-                        wavBase64: b64,
-                        jobId: jobId != null ? String(jobId) : null,
-                    });
-                    const name = String(path || '').split(/[/\\]/).pop() || path;
-                    this._showToast(`Đã lưu WAV kiểm tra: ${name}`, 'success');
-                } catch (e) {
-                    console.warn('[HaLin] save live wav local:', e);
-                    this._showToast(`Không lưu được WAV cục bộ: ${String(e?.message || e)}`, 'error');
-                }
+            finalizeLiveAudio: async ({ baseUrl, jobId }) => {
+                return await this._finalizeAndUploadLiveAudio({ baseUrl, jobId });
             },
             onTranscriptSegments: (segments) => {
                 if (!Array.isArray(segments) || !this.transcriptUI) return;
@@ -138,56 +122,78 @@ class App {
         return this._refreshPromise;
     }
 
-    /** Encode binary for Tauri IPC (avoids stack overflow on large buffers). */
-    _uint8ArrayToBase64(u8) {
-        const bytes = u8 instanceof Uint8Array ? u8 : new Uint8Array(u8 || []);
-        const CHUNK = 0x8000;
-        let binary = '';
-        for (let i = 0; i < bytes.length; i += CHUNK) {
-            binary += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + CHUNK, bytes.length)));
+    /**
+     * Phase 1 of long-session refactor: finalize the on-disk WAV, archive a copy for QA,
+     * upload to HaLin, delete the temp file. Returns true if audio was captured (even
+     * if upload failed — the file may exist for manual retry).
+     */
+    async _finalizeAndUploadLiveAudio({ baseUrl, jobId }) {
+        let meta = null;
+        try {
+            meta = await invoke('finalize_session_recording');
+        } catch (e) {
+            // No active recording (e.g. start_session_recording never ran). Not an error
+            // for callers — just signal "no audio captured".
+            console.warn('[HaLin] finalize_session_recording:', e);
+            return false;
         }
-        return btoa(binary);
-    }
+        if (!meta || !Number(meta.pcmBytes)) {
+            try { await invoke('delete_session_recording_file', { path: meta?.path || '' }); } catch {}
+            return false;
+        }
 
-    _buildWavFromPcmS16le(pcmBytes, sampleRate = 16000, numChannels = 1) {
-        const pcm = pcmBytes instanceof Uint8Array ? pcmBytes : new Uint8Array(pcmBytes || []);
-        const bytesPerSample = 2;
-        const blockAlign = numChannels * bytesPerSample;
-        const byteRate = sampleRate * blockAlign;
-        const dataSize = pcm.length;
-        const buffer = new ArrayBuffer(44 + dataSize);
-        const view = new DataView(buffer);
-        const writeStr = (off, s) => {
-            for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i));
+        // Local archive for QA — best-effort, never blocks upload.
+        try {
+            const archivePath = await invoke('archive_session_recording', {
+                sourcePath: meta.path,
+                jobId: jobId != null ? String(jobId) : null,
+            });
+            const name = String(archivePath || '').split(/[/\\]/).pop() || archivePath;
+            this._showToast(`Đã lưu WAV kiểm tra: ${name}`, 'success');
+        } catch (e) {
+            console.warn('[HaLin] archive live wav:', e);
+        }
+
+        const tryUpload = async (token) => {
+            return await invoke('upload_session_recording_to_halin', {
+                baseUrl: String(baseUrl || ''),
+                token: String(token || ''),
+                jobId: String(jobId),
+                sourcePath: meta.path,
+            });
         };
-        writeStr(0, 'RIFF');
-        view.setUint32(4, 36 + dataSize, true);
-        writeStr(8, 'WAVE');
-        writeStr(12, 'fmt ');
-        view.setUint32(16, 16, true); // PCM fmt chunk size
-        view.setUint16(20, 1, true); // PCM format
-        view.setUint16(22, numChannels, true);
-        view.setUint32(24, sampleRate, true);
-        view.setUint32(28, byteRate, true);
-        view.setUint16(32, blockAlign, true);
-        view.setUint16(34, 16, true); // bits per sample
-        writeStr(36, 'data');
-        view.setUint32(40, dataSize, true);
-        new Uint8Array(buffer, 44).set(pcm);
-        return new Uint8Array(buffer);
-    }
 
-    _mergeUint8Chunks(chunks) {
-        const arr = Array.isArray(chunks) ? chunks : [];
-        const total = arr.reduce((s, b) => s + (b?.length || 0), 0);
-        const out = new Uint8Array(total);
-        let off = 0;
-        for (const b of arr) {
-            if (!b || !b.length) continue;
-            out.set(b, off);
-            off += b.length;
+        let token = this._getHalinToken();
+        let resp;
+        try {
+            resp = await tryUpload(token);
+        } catch (e) {
+            this._showToast(`Không upload được audio buổi học: ${String(e?.message || e)}`, 'error');
+            return true; // file exists on disk
         }
-        return out;
+        const status = Number(resp?.status || 0);
+        if (status === 401 || status === 403) {
+            // Refresh token and retry once.
+            try {
+                const s = settingsManager.get();
+                await this._refreshTokenOnce(s.halin_base_url, s.halin_refresh_token);
+                token = this._getHalinToken();
+                resp = await tryUpload(token);
+            } catch (e) {
+                this._showToast(`Phiên đăng nhập hết hạn — chưa upload được audio: ${String(e?.message || e)}`, 'error');
+                return true;
+            }
+        }
+        const finalStatus = Number(resp?.status || 0);
+        if (finalStatus < 200 || finalStatus >= 300) {
+            const body = String(resp?.body || '').slice(0, 200);
+            this._showToast(`Upload audio thất bại HTTP ${finalStatus}: ${body}`, 'error');
+            return true;
+        }
+
+        // Successful upload: delete the temp file so it doesn't accumulate.
+        try { await invoke('delete_session_recording_file', { path: meta.path }); } catch {}
+        return true;
     }
 
     _updateHalinBackendStatus(metrics) {
@@ -217,7 +223,44 @@ class App {
     /** Khi tắt HaLin Phân Tích: luôn được bắt đầu. Khi bật: cần chủ đề đã lưu trong cài đặt. */
     _sessionSetupAllowsStart() {
         if (!this.halinSession?.isEnabled?.()) return true;
-        return String(settingsManager.get().halin_topic || '').trim().length > 0;
+        // After each stop, teacher must re-confirm setup by clicking "Lưu thiết lập"
+        return this._sessionSetupConfirmed &&
+               String(settingsManager.get().halin_topic || '').trim().length > 0;
+    }
+
+    _resetSessionSetupForm() {
+        // Clear transient per-session fields (topic, schedule, students, lesson plan)
+        const tpEl = document.getElementById('ssc-topic');
+        if (tpEl) tpEl.value = '';
+
+        const schedEl = document.getElementById('ssc-scheduled-start');
+        if (schedEl) schedEl.value = '';
+
+        const totalEl = document.getElementById('ssc-total-students');
+        if (totalEl) totalEl.value = '';
+
+        const lpVocabEl = document.getElementById('ssc-lesson-plan-vocab');
+        if (lpVocabEl) lpVocabEl.value = '';
+
+        const lpGrammarEl = document.getElementById('ssc-lesson-plan-grammar');
+        if (lpGrammarEl) lpGrammarEl.value = '';
+
+        // Keep lesson type & level as-is (useful defaults for next session)
+        // Clear topic from persisted settings so app restart also shows empty
+        settingsManager.saveDebounced({
+            halin_topic: '',
+            halin_scheduled_start: '',
+            halin_total_students_enrolled: '',
+            halin_lesson_plan_vocabulary: '',
+            halin_lesson_plan_grammar: '',
+        });
+
+        // Update status hint
+        const statusEl = document.getElementById('ssc-status');
+        if (statusEl) {
+            statusEl.textContent = 'Nhập thông tin buổi học mới và bấm Lưu thiết lập';
+            statusEl.className = 'ssc-status';
+        }
     }
 
     _initSessionSetupCard() {
@@ -254,8 +297,13 @@ class App {
             if (lpGrammarEl && document.activeElement !== lpGrammarEl) lpGrammarEl.value = String(ss.halin_lesson_plan_grammar || '');
             syncHint();
             if (status) {
-                status.textContent = this._sessionSetupAllowsStart() ? '✓ Sẵn sàng bắt đầu' : '';
-                status.className = this._sessionSetupAllowsStart() ? 'ssc-status ready' : 'ssc-status';
+                const canStart = this._sessionSetupAllowsStart();
+                status.textContent = canStart
+                    ? '✓ Sẵn sàng bắt đầu'
+                    : (String(settingsManager.get().halin_topic || '').trim().length > 0
+                        ? 'Bấm Lưu thiết lập để xác nhận buổi học mới'
+                        : '');
+                status.className = canStart ? 'ssc-status ready' : 'ssc-status';
             }
         };
 
@@ -307,7 +355,9 @@ class App {
                 status.textContent = '✓ Sẵn sàng bắt đầu';
                 status.className = 'ssc-status ready';
             }
+            this._sessionSetupConfirmed = true;
             this._updateStartButton();
+            this._refreshSessionChrome();
             this._showToast('Đã lưu thiết lập buổi học', 'success');
         });
     }
@@ -833,6 +883,10 @@ class App {
 
         document.getElementById('btn-result-dismiss')?.addEventListener('click', () => {
             this._hideSessionResultCard();
+            this._isPollingJob = false;
+            this._updateStartButton();
+            // Show setup card so teacher prepares next session
+            document.getElementById('session-setup-card')?.classList.remove('hidden');
         });
 
         document.getElementById('btn-result-new-session')?.addEventListener('click', () => {
@@ -841,20 +895,20 @@ class App {
             this.transcriptUI.showPlaceholder();
             this.recordingStartTime = null;
             this.lastSessionDurationLabel = null;
+            this._sessionSetupConfirmed = false;
+            this._isPollingJob = false;
+            this._updateStartButton();
+            this._refreshSessionChrome();
+            this._resetSessionSetupForm();
             document.getElementById('session-setup-card')?.classList.remove('hidden');
-            const statusEl = document.getElementById('ssc-status');
-            if (statusEl) {
-                statusEl.textContent = '';
-                statusEl.className = 'ssc-status';
-            }
         });
 
         document.getElementById('btn-result-dashboard')?.addEventListener('click', (e) => {
             e.preventDefault();
             const jobId = document.getElementById('session-result-card')?.dataset?.jobId || '';
             const s = settingsManager.get();
-            const base = String(s.halin_base_url || DEFAULT_HALIN_API_BASE_URL).replace(/\/+$/, '');
-            const url = `${base}/dashboard/#/training/job-detail?id=${encodeURIComponent(String(jobId))}`;
+            const base = String(s.halin_dashboard_url || DEFAULT_HALIN_API_BASE_URL).replace(/\/+$/, '');
+            const url = `${base}/#/training/jobs/${encodeURIComponent(String(jobId))}`;
             try {
                 window.__TAURI__?.opener?.openUrl?.(url);
             } catch {
@@ -862,18 +916,17 @@ class App {
             }
         });
 
-        // Clear button — clears display only (auto-save happens on stop)
+        // Clear button — clears display and resets session setup
         document.getElementById('btn-clear').addEventListener('click', async () => {
             this.transcriptUI.clear();
             this.transcriptUI.showPlaceholder();
             this.recordingStartTime = null;
             this.lastSessionDurationLabel = null;
+            this._sessionSetupConfirmed = false;
+            this._updateStartButton();
+            this._refreshSessionChrome();
+            this._resetSessionSetupForm();
             document.getElementById('session-setup-card')?.classList.remove('hidden');
-            const statusEl = document.getElementById('ssc-status');
-            if (statusEl) {
-                statusEl.textContent = '';
-                statusEl.className = 'ssc-status';
-            }
         });
 
         // Copy transcript button
@@ -1631,8 +1684,6 @@ class App {
         const topic = String(s.halin_topic || '').trim();
         const lesson = String(s.halin_lesson_type || 'conversation').trim();
         const level = String(s.halin_level || 'N5').trim();
-        const title = topic || `Buổi ${lesson}`;
-        const meta = `${level} · ${lesson}`;
         const email = String(s.halin_email || '').trim();
         const userName = email ? email.split('@')[0] : 'Giáo viên';
 
@@ -1645,17 +1696,28 @@ class App {
             mixed: 'Hỗn hợp',
         };
 
-        const hs = document.getElementById('header-session-name');
-        if (hs) hs.textContent = title;
         const hu = document.getElementById('header-user-name');
         if (hu) hu.textContent = userName;
         const pi = document.getElementById('header-profile-initial');
         if (pi) pi.textContent = (userName[0] || 'G').toUpperCase();
 
+        // If setup not yet confirmed for this session, show pending state on footer
+        const halinOn = this.halinSession?.isEnabled?.();
+        const confirmed = this._sessionSetupConfirmed;
+        const hs = document.getElementById('header-session-name');
         const dockLt = document.getElementById('dock-lesson-type');
-        if (dockLt) dockLt.textContent = lessonDockLabels[lesson] || lesson;
         const dockLv = document.getElementById('dock-level');
-        if (dockLv) dockLv.textContent = level;
+
+        if (halinOn && !confirmed && !this.isRunning) {
+            if (hs) { hs.textContent = 'Chưa thiết lập buổi học'; hs.style.opacity = '0.45'; }
+            if (dockLt) { dockLt.textContent = '—'; dockLt.style.opacity = '0.45'; }
+            if (dockLv) { dockLv.textContent = '—'; dockLv.style.opacity = '0.45'; }
+        } else {
+            const title = topic || `Buổi ${lesson}`;
+            if (hs) { hs.textContent = title; hs.style.opacity = ''; }
+            if (dockLt) { dockLt.textContent = lessonDockLabels[lesson] || lesson; dockLt.style.opacity = ''; }
+            if (dockLv) { dockLv.textContent = level; dockLv.style.opacity = ''; }
+        }
     }
 
     _startSessionTimer() {
@@ -2070,14 +2132,21 @@ class App {
         // Start HaLin live_capture session (optional)
         if (this.halinSession.isEnabled()) {
             try {
-                // Full-session WAV recording for post-processing diarization.
-                this._liveFullPcmChunks = [];
-                this._buildLiveWavBytesForFinalize = () => {
-                    const pcm = this._mergeUint8Chunks(this._liveFullPcmChunks || []);
-                    if (!pcm.length) return null;
-                    return this._buildWavFromPcmS16le(pcm, 16000, 1);
-                };
                 await this.halinSession.start();
+                // Open the on-disk WAV recorder *after* the job_id is known so the file
+                // stem matches the job. Audio frames are written directly to disk by
+                // the Rust capture forwarder — the JS heap never holds full-session PCM.
+                try {
+                    await invoke('start_session_recording', {
+                        jobId: this.halinSession.jobId || null,
+                    });
+                } catch (err) {
+                    console.warn('[HaLin] start_session_recording failed:', err);
+                    this._showToast(
+                        `Không mở được file ghi âm trên đĩa: ${String(err?.message || err)}`,
+                        'error',
+                    );
+                }
                 const recHide = document.getElementById('btn-halin-recover');
                 if (recHide) recHide.hidden = true;
             } catch (err) {
@@ -2123,7 +2192,8 @@ class App {
                     audioChunkCount++;
                     const bytes = new Uint8Array(pcmData);
                     this.halinSession.addPcmAudio(bytes);
-                    if (this._liveFullPcmChunks) this._liveFullPcmChunks.push(bytes);
+                    // Full-session WAV is written to disk by the Rust audio forwarder
+                    // (see commands::session_recording) — no in-memory accumulation here.
                     if (audioChunkCount <= 3 || audioChunkCount % 50 === 0) {
                         console.log(`[Audio] Batch #${audioChunkCount}, size:`, bytes.length || 0);
                     }
@@ -2411,8 +2481,10 @@ class App {
     }
 
     async stop() {
+        this._sessionSetupConfirmed = false; // Force re-confirm setup before next session
         this.isRunning = false;
         this._updateStartButton();
+        this._refreshSessionChrome();
         this.sessionStartTime = null;
         this._stopSessionTimer();
         this._snapshotSessionDurationLabel();
@@ -2447,23 +2519,31 @@ class App {
 
         audioPlayer.stop();
 
+        // Pre-reset form fields silently (no UI show yet — wait for teacher to click "Buổi học mới")
+        this._resetSessionSetupForm();
+        document.getElementById('session-setup-card')?.classList.add('hidden');
+
         // Finalize HaLin session after capture stops
         if (this.halinSession.isEnabled()) {
             try {
                 const r = await this.halinSession.stopAndFinalize();
-                // Release large buffers after finalize (WAV upload may be big).
-                this._liveFullPcmChunks = [];
-                this._buildLiveWavBytesForFinalize = null;
                 const rec = document.getElementById('btn-halin-recover');
                 if (rec) rec.hidden = true;
                 const jobId = r?.job_id || this.halinSession?.jobId || null;
                 if (jobId) {
-                    this._pollHalinJobCompleted(jobId).catch(() => {});
+                    this._isPollingJob = true;
+                    this._updateStartButton();
+                    this._pollHalinJobCompleted(jobId).catch(() => {}).finally(() => {
+                        this._isPollingJob = false;
+                        this._updateStartButton();
+                    });
                 }
             } catch (err) {
                 this._showToast('Không kết thúc được phiên HaLin — có thể dùng Khôi phục từ bộ đệm.', 'error');
                 const rec = document.getElementById('btn-halin-recover');
                 if (rec) rec.hidden = false;
+                // Ensure the on-disk recording isn't leaked if finalize failed.
+                try { await invoke('discard_session_recording'); } catch {}
             }
         }
 
@@ -2483,16 +2563,21 @@ class App {
         btn.classList.toggle('recording', this.isRunning);
         iconPlay.style.display = this.isRunning ? 'none' : 'block';
         iconStop.style.display = this.isRunning ? 'block' : 'none';
-        if (label) label.textContent = this.isRunning ? 'Dừng' : 'Bắt đầu';
-        if (!this.isRunning) {
+        if (this.isRunning) {
+            if (label) label.textContent = 'Dừng';
+            btn.disabled = false;
+            btn.title = 'Dừng ghi nhận';
+        } else if (this._isPollingJob) {
+            if (label) label.textContent = 'Đang phân tích...';
+            btn.disabled = true;
+            btn.title = 'Đang gửi dữ liệu lên HaLin để phân tích, vui lòng chờ...';
+        } else {
+            if (label) label.textContent = 'Bắt đầu';
             const allow = this._sessionSetupAllowsStart();
             btn.disabled = !allow;
             btn.title = allow
                 ? 'Bắt đầu / Dừng (Space)'
-                : 'Nhập chủ đề buổi học và bấm Lưu thiết lập trên sidebar (hoặc tắt HaLin Phân Tích để bắt đầu ngay)';
-        } else {
-            btn.disabled = false;
-            btn.title = 'Dừng ghi nhận';
+                : 'Nhập thông tin buổi học và bấm Lưu thiết lập (hoặc tắt HaLin Phân Tích để bắt đầu ngay)';
         }
         document.getElementById('app-footer-dock')?.classList.toggle('recording', this.isRunning);
         this._updateSourceButtons();
@@ -3014,8 +3099,8 @@ class App {
             link.onclick = (e) => {
                 e.preventDefault();
                 const s = settingsManager.get();
-                const base = String(s.halin_base_url || DEFAULT_HALIN_API_BASE_URL).replace(/\/+$/, '');
-                const url = `${base}/dashboard/#/training/job-detail?id=${encodeURIComponent(String(jobId || ''))}`;
+                const base = String(s.halin_dashboard_url || DEFAULT_HALIN_API_BASE_URL).replace(/\/+$/, '');
+                const url = `${base}/#/training/jobs/${encodeURIComponent(String(jobId || ''))}`;
                 try {
                     window.__TAURI__?.opener?.openUrl?.(url);
                 } catch {

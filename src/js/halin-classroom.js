@@ -1,4 +1,4 @@
-import { appendAudioChunk, finalizeLiveSession, listTeacherVoices, startLiveSession, uploadLiveAudioWav } from './halin-client.js';
+import { appendAudioChunk, finalizeLiveSession, listTeacherVoices, startLiveSession } from './halin-client.js';
 import { halinRefresh } from './halin-auth.js';
 import { HalinChunkQueue } from './halin-chunk-queue.js';
 import { logError, logInfo, logWarn } from './logger.js';
@@ -41,8 +41,7 @@ export class HalinClassroomSession {
     onMetrics,
     onTranscriptSegments,
     getClientSegmentsForFinalize,
-    getLiveWavBytesForFinalize,
-    onLiveWavAfterCapture,
+    finalizeLiveAudio,
   }) {
     this.getSettings = getSettings;
     this.setSettings = setSettings || (async () => {});
@@ -52,10 +51,14 @@ export class HalinClassroomSession {
     this.onTranscriptSegments = onTranscriptSegments || (() => {});
     /** @type {(() => object[] | null) | null} Transcript rows for finalize-live when DB chunks are empty */
     this._getClientSegmentsForFinalize = getClientSegmentsForFinalize || null;
-    /** @type {(() => Uint8Array | ArrayBuffer | null) | null} WAV bytes uploaded before finalize (optional). */
-    this._getLiveWavBytesForFinalize = getLiveWavBytesForFinalize || null;
-    /** @type {((wav: Uint8Array, meta: { jobId: string | null }) => void | Promise<void>) | null} Local disk copy for QA. */
-    this._onLiveWavAfterCapture = onLiveWavAfterCapture || null;
+    /**
+     * Async hook that takes the on-disk session recording, archives it locally, uploads
+     * it to the server, and cleans up. Returns true when audio was uploaded successfully
+     * (or failed but still exists on disk for retry), false when no audio was captured.
+     *
+     * @type {((ctx: { baseUrl: string, jobId: string }) => Promise<boolean>) | null}
+     */
+    this._finalizeLiveAudio = finalizeLiveAudio || null;
 
     this.enabled = false;
     this.running = false;
@@ -357,53 +360,21 @@ export class HalinClassroomSession {
         ? this._getClientSegmentsForFinalize()
         : null;
 
-    // Optional: full-session WAV — local copy for QA, then upload for backend diarization.
-    let wavForUpload = null;
-    if (typeof this._getLiveWavBytesForFinalize === 'function') {
+    // Full-session audio: hand off to the app-supplied hook which finalizes the on-disk
+    // WAV (Rust), archives a local copy for QA, uploads to /live-audio, and deletes
+    // the temp file. The hook handles token refresh internally.
+    let hasWav = false;
+    if (typeof this._finalizeLiveAudio === 'function' && this.jobId) {
       try {
-        const raw = this._getLiveWavBytesForFinalize();
-        if (raw && raw.byteLength > 0) {
-          wavForUpload = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
-        }
+        hasWav = await this._finalizeLiveAudio({ baseUrl, jobId: this.jobId });
       } catch (e) {
         this.onError?.(e);
-      }
-    }
-    if (wavForUpload && typeof this._onLiveWavAfterCapture === 'function') {
-      try {
-        await this._onLiveWavAfterCapture(wavForUpload, { jobId: this.jobId });
-      } catch (e) {
-        this.onError?.(e);
-      }
-    }
-    if (wavForUpload && this.jobId) {
-      try {
-        await uploadLiveAudioWav({ baseUrl, token, jobId: this.jobId, wavBytes: wavForUpload });
-      } catch (e) {
-        const msg = String(e?.message || e);
-        if (shouldRetryAuthAfterErrorMessage(msg)) {
-          try {
-            await this._refreshIfPossible();
-            await uploadLiveAudioWav({
-              baseUrl,
-              token: this._getToken(),
-              jobId: this.jobId,
-              wavBytes: wavForUpload,
-            });
-          } catch (e2) {
-            this.onError?.(e2);
-          }
-        } else {
-          this.onError?.(e);
-        }
-        // Don't block finalize; diarization will just be skipped on persistent failure.
       }
     }
 
     // If user started then stopped immediately, there may be no audio + no transcript.
     // In that case, don't persist a pending-finalize entry that will nag forever.
     const hasClientSegments = Array.isArray(clientSegments) && clientSegments.length > 0;
-    const hasWav = Boolean(wavForUpload && wavForUpload.byteLength > 0);
     if (!hasClientSegments && !hasWav) {
       this._clearPendingFinalize();
       this.running = false;

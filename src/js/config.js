@@ -1,11 +1,12 @@
 /**
  * Cấu hình mặc định — desktop HaLin AI Platform
  *
- * URL máy chủ API HaLin: dùng cho đăng nhập, cài đặt và gọi backend.
- * Người dùng không cần biết địa chỉ kỹ thuật — form sẽ điền sẵn giá trị này.
+ * URL backend được quyết định bởi Rust settings.rs dựa theo build mode:
+ *   - tauri dev  (debug)   → http://localhost:8000
+ *   - tauri build (release) → https://noibo.hanoilink.edu.vn
  *
- * Khi phát hành bản production, chỉ cần đổi hằng số tại đây (và đồng bộ
- * `DEFAULT_HALIN_BASE_URL` trong `src-tauri/src/settings.rs`).
+ * Hằng số này chỉ là fallback JS khi settings Rust bị lỗi hoàn toàn.
+ * Không cần sửa file này khi chuyển qua lại giữa dev và production.
  */
 export const DEFAULT_HALIN_API_BASE_URL = 'https://noibo.hanoilink.edu.vn';
 
