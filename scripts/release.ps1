@@ -119,24 +119,32 @@ try {
         }
     }
 
-    # IMPORTANT — encoding gotcha:
-    # PowerShell 5.1's `Set-Content -Encoding UTF8` writes a UTF-8 BOM at the start
-    # of the file. tauri.conf.json + package.json reject a BOM (JSON parsers fail with
-    # "Expecting value: line 1 column 1"), and Cargo also misreports the version
-    # field when Cargo.toml starts with a BOM. We use a helper that writes UTF-8
-    # WITHOUT BOM via the .NET API directly, which behaves identically on PS 5.1
-    # and PS 7.
+    # IMPORTANT — encoding gotcha (PowerShell 5.1):
+    #
+    # `Get-Content` defaults to the system code page (e.g. cp1252 / cp1258 on
+    # Vietnamese Windows). For files that contain multi-byte UTF-8 sequences
+    # (em-dash, Vietnamese diacritics, etc.) this misreads the bytes as Latin-1,
+    # and then `Set-Content -Encoding UTF8` re-encodes the misread chars back
+    # to UTF-8 — producing mojibake (`—` → `â€"`, `Đ` → `Ä`).
+    #
+    # `Set-Content -Encoding UTF8` also writes a BOM at the start of the file,
+    # which tauri.conf.json / package.json / Cargo.toml all reject.
+    #
+    # Use direct .NET I/O with an explicit UTF-8 (no BOM) encoding for both
+    # read and write. This works identically on PS 5.1 and PS 7.
+    function Read-Utf8 {
+        param([string]$Path)
+        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+        return [System.IO.File]::ReadAllText((Resolve-Path $Path), $utf8NoBom)
+    }
     function Write-Utf8NoBom {
         param([string]$Path, [string]$Content)
-        # NB: `[System.IO.File]::WriteAllText` takes an Encoding argument; the
-        # parameterless `UTF8Encoding()` ctor defaults to NO BOM. Set-Content
-        # cannot do this on PS 5.1 without third-party helpers.
         $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
         [System.IO.File]::WriteAllText((Resolve-Path $Path), $Content, $utf8NoBom)
     }
 
     # 1. Cargo.toml — `version = "x.y.z"` at top-level [package] table.
-    $cargoContent = Get-Content $cargoPath -Raw
+    $cargoContent = Read-Utf8 $cargoPath
     $cargoNew = $cargoContent -replace '(?m)^version\s*=\s*"[^"]+"', "version = `"$Version`""
     if ($cargoNew -eq $cargoContent) {
         Write-Error-Exit "Failed to update version in $cargoPath (regex didn't match)"
@@ -145,7 +153,7 @@ try {
     Write-Host "  patched $cargoPath"
 
     # 2. tauri.conf.json — `"version": "x.y.z"`
-    $tauriContent = Get-Content $tauriPath -Raw
+    $tauriContent = Read-Utf8 $tauriPath
     $tauriNew = $tauriContent -replace '"version"\s*:\s*"[^"]+"', "`"version`": `"$Version`""
     if ($tauriNew -eq $tauriContent) {
         Write-Error-Exit "Failed to update version in $tauriPath"
@@ -154,7 +162,7 @@ try {
     Write-Host "  patched $tauriPath"
 
     # 3. package.json — first `"version": "x.y.z"` (top-level).
-    $pkgContent = Get-Content $pkgPath -Raw
+    $pkgContent = Read-Utf8 $pkgPath
     # Use [Regex]::Replace with count=1 so we don't accidentally clobber a dep
     # named "version" inside dependencies.
     $regex = [System.Text.RegularExpressions.Regex]::new('"version"\s*:\s*"[^"]+"')
@@ -169,7 +177,7 @@ try {
     # `<span id="about-version">vX.Y.Z</span>`. Match by id attribute so we
     # don't touch other version strings (e.g. in release notes) that may live
     # elsewhere in the HTML.
-    $htmlContent = Get-Content $htmlPath -Raw
+    $htmlContent = Read-Utf8 $htmlPath
     $htmlPattern = '(<span[^>]*id="about-version"[^>]*>)v[^<]+(</span>)'
     $htmlReplacement = '${1}v' + $Version + '${2}'
     $htmlNew = [System.Text.RegularExpressions.Regex]::Replace($htmlContent, $htmlPattern, $htmlReplacement)
