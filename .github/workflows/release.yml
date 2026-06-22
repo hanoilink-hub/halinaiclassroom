@@ -231,10 +231,57 @@ jobs:
 
           REPO="https://github.com/hanoilink-hub/halinaiclassroom/releases/download/v${VERSION}"
 
-          # Find actual filenames
-          DARWIN_AARCH64_FILE=$(ls artifacts/macos/macos/*_aarch64.app.tar.gz 2>/dev/null | head -1 | xargs basename || echo "")
-          DARWIN_X86_64_FILE=$(ls artifacts/macos-intel/macos/*_x64.app.tar.gz 2>/dev/null | head -1 | xargs basename || echo "")
-          WINDOWS_X86_64_FILE=$(ls artifacts/windows/nsis/*.exe 2>/dev/null | head -1 | xargs basename || echo "")
+          # Find actual filenames. The previous `ls | xargs basename` pipeline broke
+          # on filenames containing spaces (e.g. "HaLin AI Platform_aarch64.app.tar.gz")
+          # because xargs splits on whitespace, producing an empty result. Use a glob
+          # + array indexing pattern so the space is preserved as a single token, then
+          # urlencode the filename before embedding it in the JSON URL.
+          urlencode() {
+            python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$1"
+          }
+          # GitHub Release server rewrites spaces in uploaded asset filenames to `.`
+          # (so "HaLin AI Platform_x64.app.tar.gz" lands at
+          # "HaLin.AI.Platform_x64.app.tar.gz"). Apply the same transform to the
+          # filename we embed in latest.json so the URL resolves on the server side.
+          gh_release_normalize() {
+            printf '%s' "$1" | sed 's/ /./g'
+          }
+          pick_first() {
+            local pattern="$1"
+            local files=( $pattern )
+            # Use literal shell glob; if no match, files[0] will be the pattern string.
+            shopt -s nullglob
+            files=( $pattern )
+            shopt -u nullglob
+            if [ ${#files[@]} -eq 0 ]; then
+              echo ""
+            else
+              basename "${files[0]}"
+            fi
+          }
+
+          DARWIN_AARCH64_FILE=$(pick_first "artifacts/macos/macos/*_aarch64.app.tar.gz")
+          DARWIN_X86_64_FILE=$(pick_first "artifacts/macos-intel/macos/*_x64.app.tar.gz")
+          WINDOWS_X86_64_FILE=$(pick_first "artifacts/windows/nsis/*.exe")
+
+          # Sanity check — fail the job if any filename is empty rather than silently
+          # producing a broken latest.json with empty URLs.
+          if [ -z "$DARWIN_AARCH64_FILE" ] || [ -z "$DARWIN_X86_64_FILE" ] || [ -z "$WINDOWS_X86_64_FILE" ]; then
+            echo "::error::One or more installer filenames could not be resolved"
+            echo "DARWIN_AARCH64_FILE='$DARWIN_AARCH64_FILE'"
+            echo "DARWIN_X86_64_FILE='$DARWIN_X86_64_FILE'"
+            echo "WINDOWS_X86_64_FILE='$WINDOWS_X86_64_FILE'"
+            echo "--- artifacts tree ---"
+            find artifacts -type f
+            exit 1
+          fi
+
+          # Apply the GitHub-side rename FIRST, then urlencode anything else (e.g.
+          # parentheses, apostrophes) so the embedded URL is safe regardless of
+          # what the bundle name expands to in future versions.
+          DARWIN_AARCH64_FILE_ENC=$(urlencode "$(gh_release_normalize "$DARWIN_AARCH64_FILE")")
+          DARWIN_X86_64_FILE_ENC=$(urlencode "$(gh_release_normalize "$DARWIN_X86_64_FILE")")
+          WINDOWS_X86_64_FILE_ENC=$(urlencode "$(gh_release_normalize "$WINDOWS_X86_64_FILE")")
 
           cat > artifacts/latest.json << EOF
           {
@@ -244,15 +291,15 @@ jobs:
             "platforms": {
               "darwin-aarch64": {
                 "signature": "${DARWIN_AARCH64_SIG}",
-                "url": "${REPO}/${DARWIN_AARCH64_FILE}"
+                "url": "${REPO}/${DARWIN_AARCH64_FILE_ENC}"
               },
               "darwin-x86_64": {
                 "signature": "${DARWIN_X86_64_SIG}",
-                "url": "${REPO}/${DARWIN_X86_64_FILE}"
+                "url": "${REPO}/${DARWIN_X86_64_FILE_ENC}"
               },
               "windows-x86_64": {
                 "signature": "${WINDOWS_X86_64_SIG}",
-                "url": "${REPO}/${WINDOWS_X86_64_FILE}"
+                "url": "${REPO}/${WINDOWS_X86_64_FILE_ENC}"
               }
             }
           }
