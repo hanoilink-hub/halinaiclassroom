@@ -1,4 +1,4 @@
-# Release script for halin classroom desktop app.
+﻿# Release script for halin classroom desktop app.
 #
 # Usage (from anywhere):
 #   .\scripts\release.ps1 0.7.0
@@ -94,7 +94,7 @@ try {
     git fetch origin --tags 2>$null
     $existingTag = git tag -l $Tag
     if ($existingTag) {
-        Write-Error-Exit "Tag $Tag already exists locally. Delete it first if intentional: git tag -d $Tag && git push origin :refs/tags/$Tag"
+        Write-Error-Exit "Tag $Tag already exists locally. Delete it first if intentional: 'git tag -d $Tag' then 'git push origin :refs/tags/$Tag'"
     }
     $remoteTag = git ls-remote --tags origin "refs/tags/$Tag"
     if ($remoteTag) {
@@ -154,9 +154,9 @@ try {
     # don't touch other version strings (e.g. in release notes) that may live
     # elsewhere in the HTML.
     $htmlContent = Get-Content $htmlPath -Raw
-    $htmlNew = $htmlContent -replace `
-        '(<span[^>]*id="about-version"[^>]*>)v[^<]+(</span>)', `
-        "`${1}v$Version`${2}"
+    $htmlPattern = '(<span[^>]*id="about-version"[^>]*>)v[^<]+(</span>)'
+    $htmlReplacement = '${1}v' + $Version + '${2}'
+    $htmlNew = [System.Text.RegularExpressions.Regex]::Replace($htmlContent, $htmlPattern, $htmlReplacement)
     if ($htmlNew -eq $htmlContent) {
         Write-Error-Exit "Failed to update version in $htmlPath (no <span id='about-version'> match)"
     }
@@ -193,7 +193,7 @@ try {
     Write-Step "Pushing commit to main"
     git push origin main
     if ($LASTEXITCODE -ne 0) {
-        Write-Error-Exit "git push failed — fix the issue then run: git tag -a $Tag -m '$Tag' && git push origin $Tag"
+        Write-Error-Exit "git push failed — fix the issue then run: 'git tag -a $Tag -m $Tag' then 'git push origin $Tag'"
     }
 
     # ── Tag + push tag ────────────────────────────────────────────────

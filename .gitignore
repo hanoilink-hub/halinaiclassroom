@@ -64,3 +64,6 @@ scripts/test_*.py
 .private/
 GEMINI.md
 CLAUDE.md
+
+latest.json
+latest.json.template
