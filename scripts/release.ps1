@@ -119,13 +119,29 @@ try {
         }
     }
 
+    # IMPORTANT — encoding gotcha:
+    # PowerShell 5.1's `Set-Content -Encoding UTF8` writes a UTF-8 BOM at the start
+    # of the file. tauri.conf.json + package.json reject a BOM (JSON parsers fail with
+    # "Expecting value: line 1 column 1"), and Cargo also misreports the version
+    # field when Cargo.toml starts with a BOM. We use a helper that writes UTF-8
+    # WITHOUT BOM via the .NET API directly, which behaves identically on PS 5.1
+    # and PS 7.
+    function Write-Utf8NoBom {
+        param([string]$Path, [string]$Content)
+        # NB: `[System.IO.File]::WriteAllText` takes an Encoding argument; the
+        # parameterless `UTF8Encoding()` ctor defaults to NO BOM. Set-Content
+        # cannot do this on PS 5.1 without third-party helpers.
+        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+        [System.IO.File]::WriteAllText((Resolve-Path $Path), $Content, $utf8NoBom)
+    }
+
     # 1. Cargo.toml — `version = "x.y.z"` at top-level [package] table.
     $cargoContent = Get-Content $cargoPath -Raw
     $cargoNew = $cargoContent -replace '(?m)^version\s*=\s*"[^"]+"', "version = `"$Version`""
     if ($cargoNew -eq $cargoContent) {
         Write-Error-Exit "Failed to update version in $cargoPath (regex didn't match)"
     }
-    Set-Content -Path $cargoPath -Value $cargoNew -NoNewline -Encoding UTF8
+    Write-Utf8NoBom -Path $cargoPath -Content $cargoNew
     Write-Host "  patched $cargoPath"
 
     # 2. tauri.conf.json — `"version": "x.y.z"`
@@ -134,7 +150,7 @@ try {
     if ($tauriNew -eq $tauriContent) {
         Write-Error-Exit "Failed to update version in $tauriPath"
     }
-    Set-Content -Path $tauriPath -Value $tauriNew -NoNewline -Encoding UTF8
+    Write-Utf8NoBom -Path $tauriPath -Content $tauriNew
     Write-Host "  patched $tauriPath"
 
     # 3. package.json — first `"version": "x.y.z"` (top-level).
@@ -146,7 +162,7 @@ try {
     if ($pkgNew -eq $pkgContent) {
         Write-Error-Exit "Failed to update version in $pkgPath"
     }
-    Set-Content -Path $pkgPath -Value $pkgNew -NoNewline -Encoding UTF8
+    Write-Utf8NoBom -Path $pkgPath -Content $pkgNew
     Write-Host "  patched $pkgPath"
 
     # 4. src/index.html — the About section hardcodes the version label as
@@ -160,7 +176,7 @@ try {
     if ($htmlNew -eq $htmlContent) {
         Write-Error-Exit "Failed to update version in $htmlPath (no <span id='about-version'> match)"
     }
-    Set-Content -Path $htmlPath -Value $htmlNew -NoNewline -Encoding UTF8
+    Write-Utf8NoBom -Path $htmlPath -Content $htmlNew
     Write-Host "  patched $htmlPath"
 
     # ── Show diff ─────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-﻿[package]
+[package]
 name = "halin-platform"
 version = "0.6.1"
 description = "HaLin AI Platform â€” HanoiLink"
