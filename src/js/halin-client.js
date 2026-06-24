@@ -70,6 +70,47 @@ export async function listTeacherVoices({ baseUrl, token, limit = 5 }) {
   return await parseEnvelope(res);
 }
 
+/**
+ * Phase 7C — sessions the logged-in teacher is scheduled to teach today (or in
+ * the next ``daysAhead`` days). Powers the Desktop "pick a session" UI.
+ * Returns ``{ items: [{ id, class_id, class_code, class_name, session_no,
+ * planned_date, topic, objectives, duration_minutes, ... }, ...] }``.
+ */
+export async function listTodaySessions({ baseUrl, token, daysAhead = 0, onDate = null }) {
+  const base = normalizeBaseUrl(baseUrl);
+  const params = new URLSearchParams();
+  params.set('days_ahead', String(daysAhead));
+  if (onDate) params.set('on_date', String(onDate));
+  const url = `${base}/api/v1/training/today-sessions?${params.toString()}`;
+  const res = await halinFetch(url, {
+    method: 'GET',
+    headers: { ...authHeaders(token) },
+  }, 15000);
+  return await parseEnvelope(res);
+}
+
+/** Open a break on a live capture job (teacher pressed Pause). */
+export async function pauseLiveSession({ baseUrl, token, jobId }) {
+  const base = normalizeBaseUrl(baseUrl);
+  const res = await halinFetch(`${base}/api/v1/training/jobs/${jobId}/breaks/pause`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify({ type: 'manual' }),
+  }, 15000);
+  return await parseEnvelope(res);
+}
+
+/** Close the currently-open break (teacher pressed Resume). */
+export async function resumeLiveSession({ baseUrl, token, jobId }) {
+  const base = normalizeBaseUrl(baseUrl);
+  const res = await halinFetch(`${base}/api/v1/training/jobs/${jobId}/breaks/resume`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: '{}',
+  }, 15000);
+  return await parseEnvelope(res);
+}
+
 export async function postSttChunk({
   baseUrl,
   token,
@@ -124,11 +165,19 @@ export async function appendAudioChunk({ baseUrl, token, jobId, chunkSeq, chunkS
     `&chunk_start_seconds=${encodeURIComponent(String(chunkStartSeconds))}` +
     `&sample_rate=${encodeURIComponent(String(sampleRate))}` +
     `&num_channels=${encodeURIComponent(String(numChannels))}`;
+  // Each chunk runs server-side STT (Soniox realtime via a fresh WebSocket,
+  // or Whisper on CPU). Whisper on a 4-vCPU box can take 15–25 s per 5-s
+  // chunk; Soniox real-time ~3–5 s typical but can stall when the API or
+  // network has a hiccup. The old 20 s budget gave almost no headroom, so
+  // teachers saw frequent timeouts that were really transient slowness, not
+  // hard failures. Use 60 s — long enough to absorb worst-case Whisper but
+  // still short enough that a truly hung request fails before the next chunk
+  // queues up.
   const res = await halinFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/octet-stream', ...authHeaders(token) },
     body: pcmS16leBytes,
-  }, 20000);
+  }, 60000);
   return await parseEnvelope(res);
 }
 

@@ -275,6 +275,24 @@
             <span id="btn-start-label" class="btn-start-label">Bắt đầu</span>
           </button>
 
+          <!-- Phase 7C — Pause/Resume button. Only visible while recording. -->
+          <button
+            id="btn-pause"
+            class="pause-btn"
+            type="button"
+            hidden
+            title="Tạm dừng buổi học (giờ nghỉ trưa / giải lao)"
+          >
+            <svg id="icon-pause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <rect x="6" y="4" width="4" height="16" rx="1" />
+              <rect x="14" y="4" width="4" height="16" rx="1" />
+            </svg>
+            <svg id="icon-resume" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:none" aria-hidden="true">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            <span id="btn-pause-label">Tạm dừng</span>
+          </button>
+
           <button
             type="button"
             id="btn-halin"
@@ -341,6 +359,45 @@
             <div>
               <h2 class="ssc-title">Thiết lập buổi học</h2>
               <p class="ssc-subtitle">Điền thông tin và lưu trước khi bắt đầu ghi nhận</p>
+            </div>
+          </div>
+
+          <!-- Phase 7C — Auto-fetch sessions from class roadmap. When the teacher
+               picks a session here, topic/objective/lesson_type/duration get
+               auto-filled below. The manual fields remain editable as a fallback
+               for ad-hoc sessions that aren't in the roadmap. -->
+          <div id="ssc-session-picker" class="session-picker" hidden>
+            <div class="session-picker-header">
+              <strong>📅 Chọn buổi từ lộ trình lớp học</strong>
+              <button type="button" id="ssc-session-picker-refresh" class="ssc-link-btn" title="Tải lại danh sách">
+                ↻ Tải lại
+              </button>
+            </div>
+            <div id="ssc-session-picker-loading" class="session-picker-hint" hidden>
+              Đang lấy danh sách buổi học hôm nay…
+            </div>
+            <div id="ssc-session-picker-empty" class="session-picker-hint" hidden>
+              Không có buổi học nào trong hôm nay. Bạn có thể nhập thủ công ở bên dưới.
+            </div>
+            <div id="ssc-session-picker-error" class="session-picker-hint session-picker-error" hidden></div>
+            <ul id="ssc-session-picker-list" class="session-picker-list" role="listbox" aria-label="Buổi học có sẵn"></ul>
+            <div id="ssc-session-picker-selected" class="session-picker-selected" hidden>
+              <div class="session-picker-selected-row">
+                <span class="session-picker-selected-label">Đã chọn:</span>
+                <span id="ssc-session-picker-selected-name"></span>
+                <button type="button" id="ssc-session-picker-clear" class="ssc-link-btn">Bỏ chọn / Nhập thủ công</button>
+              </div>
+              <div class="ssc-field">
+                <label class="ssc-label" for="ssc-bonus-objective">
+                  ✏️ Mục tiêu bổ sung hôm nay (tùy chọn)
+                </label>
+                <textarea
+                  id="ssc-bonus-objective"
+                  class="ssc-textarea"
+                  rows="2"
+                  placeholder="VD: Hôm nay tập trung て-form trong câu chào hỏi"
+                ></textarea>
+              </div>
             </div>
           </div>
 

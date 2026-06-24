@@ -44,6 +44,10 @@ const DEFAULT_SETTINGS = {
   halin_total_students_enrolled: '', // number-as-string or ''
   halin_lesson_plan_vocabulary: '', // comma-separated
   halin_lesson_plan_grammar: '', // comma-separated
+  // Phase 7C — auto-fetched session id from class roadmap (empty = manual mode).
+  halin_class_lesson_plan_id: '',
+  halin_bonus_objective: '', // optional per-session goal added by teacher
+  halin_objective: '', // synced from picker or settings
 };
 
 class SettingsManager {

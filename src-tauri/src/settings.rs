@@ -103,6 +103,16 @@ pub struct Settings {
     pub halin_level: String,
     pub halin_topic: String,
     pub halin_expected_interaction_mode: String,
+    /// Phase 7C — when the desktop fetches today-sessions and the teacher picks
+    /// one, this id is sent to the server which then auto-fills topic /
+    /// objectives / duration from the ClassLessonPlan.
+    #[serde(default)]
+    pub halin_class_lesson_plan_id: String,
+    /// Phase 7C — optional per-session goal appended to the lesson plan's objective.
+    #[serde(default)]
+    pub halin_bonus_objective: String,
+    #[serde(default)]
+    pub halin_objective: String,
 }
 
 impl Default for Settings {
@@ -142,6 +152,9 @@ impl Default for Settings {
             halin_level: "N5".to_string(),
             halin_topic: "".to_string(),
             halin_expected_interaction_mode: "qa".to_string(),
+            halin_class_lesson_plan_id: String::new(),
+            halin_bonus_objective: String::new(),
+            halin_objective: String::new(),
         }
     }
 }

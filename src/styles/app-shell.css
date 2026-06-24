@@ -1943,6 +1943,135 @@
   display: none;
 }
 
+/* Phase 7C — Session picker (auto-fetch from class roadmap) */
+.session-picker {
+  background: var(--surface-alt, #f5fbf7);
+  border: 1px solid var(--border-subtle, #d7e3dc);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 0 24px 12px;
+}
+.session-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.92rem;
+  color: var(--text-strong, #1d4e2c);
+}
+.session-picker-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted, #5e6e63);
+  padding: 6px 0;
+}
+.session-picker-error {
+  color: #b3261e;
+}
+.session-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.session-picker-item {
+  background: #fff;
+  border: 1px solid var(--border-subtle, #d7e3dc);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.session-picker-item:hover {
+  border-color: var(--accent, #2f8a4f);
+  box-shadow: 0 2px 6px rgba(47, 138, 79, 0.08);
+}
+.session-picker-item.selected {
+  border-color: var(--accent, #2f8a4f);
+  background: var(--accent-soft, #e7f4eb);
+}
+.session-picker-item-row1 {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--text-strong, #1d4e2c);
+}
+.session-picker-item-row2 {
+  font-size: 0.86rem;
+  color: var(--text-muted, #5e6e63);
+}
+.session-picker-item-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted, #5e6e63);
+  opacity: 0.85;
+}
+.session-picker-selected {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-subtle, #d7e3dc);
+}
+.session-picker-selected-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.88rem;
+  margin-bottom: 8px;
+}
+.session-picker-selected-label {
+  color: var(--text-muted, #5e6e63);
+}
+.ssc-link-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent, #2f8a4f);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px 6px;
+  text-decoration: underline;
+}
+.ssc-link-btn:hover {
+  color: var(--accent-strong, #1d4e2c);
+}
+
+/* Phase 7C — Pause/Resume button (placed next to Start/Stop in the chrome) */
+.pause-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle, #d7e3dc);
+  background: #fff;
+  color: var(--text-strong, #1d4e2c);
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.pause-btn:hover { background: var(--accent-soft, #e7f4eb); }
+.pause-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.pause-btn.paused {
+  background: #fff5e6;
+  border-color: #e3a443;
+  color: #8a5614;
+}
+.session-paused-overlay {
+  margin: 8px 24px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fff5e6;
+  border: 1px solid #e3a443;
+  color: #6b3f0d;
+  font-size: 0.9rem;
+}
+
 .ssc-header {
   display: flex;
   align-items: flex-start;

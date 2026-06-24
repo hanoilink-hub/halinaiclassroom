@@ -1,4 +1,11 @@
-import { appendAudioChunk, finalizeLiveSession, listTeacherVoices, startLiveSession } from './halin-client.js';
+import {
+  appendAudioChunk,
+  finalizeLiveSession,
+  listTeacherVoices,
+  pauseLiveSession,
+  resumeLiveSession,
+  startLiveSession,
+} from './halin-client.js';
 import { halinRefresh } from './halin-auth.js';
 import { HalinChunkQueue } from './halin-chunk-queue.js';
 import { logError, logInfo, logWarn } from './logger.js';
@@ -182,6 +189,7 @@ export class HalinClassroomSession {
 
   addPcmAudio(pcmBytes) {
     if (!this.running) return;
+    if (this.paused) return;            // Phase 7C — drop frames while paused
     if (!pcmBytes || pcmBytes.length === 0) return;
     this._audioBuffer.push(new Uint8Array(pcmBytes));
   }
@@ -246,11 +254,19 @@ export class HalinClassroomSession {
         ? { target_vocabulary: vocab, target_grammar: grammar, planned_activities: [] }
         : null;
 
+    // Phase 7B/7C — when the app picked a session from /today-sessions, pass the
+    // class_lesson_plan_id and let the server fill topic/objective/duration from
+    // the class roadmap. Any field the teacher explicitly overrode in settings
+    // still wins because the server merge logic gives precedence to client values.
+    const classLessonPlanId = String(s.halin_class_lesson_plan_id || '').trim() || null;
+    const bonusObjective = String(s.halin_bonus_objective || '').trim() || null;
+
     const profile = {
       title: s.session_title || null,
       lesson_type: s.halin_lesson_type || null,
       level: s.halin_level || null,
       topic: s.halin_topic || null,
+      objective: s.halin_objective || null,
       expected_interaction_mode: s.halin_expected_interaction_mode || null,
       language_hint: null,
       external_ref: 'desktop-classroom',
@@ -260,6 +276,8 @@ export class HalinClassroomSession {
       scheduled_end: null,
       total_students_enrolled: totalStudents,
       lesson_plan: lessonPlan,
+      class_lesson_plan_id: classLessonPlanId,
+      bonus_objective: bonusObjective,
     };
 
     let r;
@@ -283,6 +301,9 @@ export class HalinClassroomSession {
     this._sessionStartMs = nowMs();
     this._lastFlushMs = nowMs();
     this.running = true;
+    this.paused = false;            // Phase 7C — pause/resume state
+    this._totalBreakMs = 0;         // accumulated break duration
+    this._currentPauseStartMs = null;
     this.onStatus?.(`HaLin session started: ${this.jobId}`);
     this._lastError = null;
     this._lastAckedSeq = null;
@@ -327,8 +348,116 @@ export class HalinClassroomSession {
     await this._drainOnce();
   }
 
+  /**
+   * Phase 7C — Tạm dừng buổi học (giờ nghỉ trưa / giải lao). Tells the backend
+   * (so all metric calculations later exclude this period) and returns control
+   * to the caller so it can stop the audio capture forwarder. No-op if not
+   * currently running or already paused.
+   */
+  async pause() {
+    if (!this.running || this.paused || !this.jobId) return false;
+    const s = this.getSettings();
+    const baseUrl = s.halin_base_url;
+    let token = this._getToken();
+    try {
+      await pauseLiveSession({ baseUrl, token, jobId: this.jobId });
+    } catch (e) {
+      const msg = String(e?.message || e);
+      if (shouldRetryAuthAfterErrorMessage(msg)) {
+        try {
+          await this._refreshIfPossible();
+          await pauseLiveSession({
+            baseUrl,
+            token: this._getToken(),
+            jobId: this.jobId,
+          });
+        } catch (e2) {
+          logWarn('halin-classroom', 'pause failed after refresh', e2);
+        }
+      } else {
+        // Server pause failed but we still want to stop sending chunks locally,
+        // so the break is at least correct in the analysis even if it's missing
+        // from the server-side breaks[] list.
+        logWarn('halin-classroom', 'pause failed (continuing locally)', e);
+      }
+    }
+    this.paused = true;
+    this._currentPauseStartMs = nowMs();
+    // Stop the chunk flush timer so we don't keep sending silence to /audio-chunks
+    // during a 60-minute lunch break.
+    if (this._tick) {
+      window.clearInterval(this._tick);
+      this._tick = null;
+    }
+    this._emitMetrics({ event: 'paused' });
+    this.onStatus?.('Tạm dừng buổi học');
+    return true;
+  }
+
+  /** Resume after a break. Re-arms the chunk flush timer. */
+  async resume() {
+    if (!this.running || !this.paused || !this.jobId) return false;
+    const s = this.getSettings();
+    const baseUrl = s.halin_base_url;
+    let token = this._getToken();
+    try {
+      await resumeLiveSession({ baseUrl, token, jobId: this.jobId });
+    } catch (e) {
+      const msg = String(e?.message || e);
+      if (shouldRetryAuthAfterErrorMessage(msg)) {
+        try {
+          await this._refreshIfPossible();
+          await resumeLiveSession({
+            baseUrl,
+            token: this._getToken(),
+            jobId: this.jobId,
+          });
+        } catch (e2) {
+          logWarn('halin-classroom', 'resume failed after refresh', e2);
+        }
+      } else {
+        logWarn('halin-classroom', 'resume failed (continuing locally)', e);
+      }
+    }
+    if (this._currentPauseStartMs) {
+      this._totalBreakMs += Math.max(0, nowMs() - this._currentPauseStartMs);
+      this._currentPauseStartMs = null;
+    }
+    this.paused = false;
+    // Discard anything that may have been buffered while we tore down the timer
+    // so old PCM doesn't slip into the post-resume chunk.
+    this._audioBuffer = [];
+    this._lastFlushMs = nowMs();
+    // Re-arm the periodic flush at the previously configured interval.
+    const chunkSeconds = clampInt(s.halin_chunk_seconds, 2, 10, 5);
+    this._tick = window.setInterval(() => {
+      this.flush(false).catch((e) => this.onError?.(e));
+    }, chunkSeconds * 1000);
+    this._emitMetrics({ event: 'resumed', total_break_ms: this._totalBreakMs });
+    this.onStatus?.('Tiếp tục buổi học');
+    return true;
+  }
+
+  /** True while paused. Used by UI to render the right button label. */
+  isPaused() {
+    return Boolean(this.paused);
+  }
+
+  /** Total accumulated break time in ms (live + historic). */
+  totalBreakMs() {
+    let total = this._totalBreakMs || 0;
+    if (this.paused && this._currentPauseStartMs) {
+      total += Math.max(0, nowMs() - this._currentPauseStartMs);
+    }
+    return total;
+  }
+
   async stopAndFinalize() {
     if (!this.running) return;
+    // If still paused at stop, close the break out so the local count is accurate.
+    if (this.paused) {
+      try { await this.resume(); } catch { /* ignore */ }
+    }
     const finalizedJobId = this.jobId;
     try {
       await this.flush(true);

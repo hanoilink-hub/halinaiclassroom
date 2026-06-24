@@ -14,15 +14,31 @@ pub struct AudioState {
     pub active_receiver: Mutex<Option<AudioForwarder>>,
 }
 
-/// Forwards audio from a receiver to a Tauri IPC channel
+/// Forwards audio from a receiver to a Tauri IPC channel.
+///
+/// ``pause_flag`` lets the forwarder be paused without tearing down the capture
+/// pipeline — the mic/system streams keep running but PCM frames are dropped
+/// instead of forwarded to the channel and the session recording file. This is
+/// used by Phase 7C pause/resume so a 7-hour session can include lunch breaks
+/// without the teacher having to stop+restart the whole pipeline.
 pub struct AudioForwarder {
     /// Handle to signal stop
     stop_flag: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    pause_flag: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl AudioForwarder {
     fn stop(&self) {
         self.stop_flag.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    fn set_paused(&self, paused: bool) {
+        self.pause_flag
+            .store(paused, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    fn is_paused(&self) -> bool {
+        self.pause_flag.load(std::sync::atomic::Ordering::SeqCst)
     }
 }
 
@@ -194,6 +210,8 @@ pub fn start_capture(
     // Spawn a thread to forward audio data from receiver to IPC channel
     let stop_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let stop_flag_clone = stop_flag.clone();
+    let pause_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let pause_flag_clone = pause_flag.clone();
 
     std::thread::spawn(move || {
         let mut buffer: Vec<u8> = Vec::with_capacity(32000); // ~1 sec at 16kHz s16le
@@ -210,9 +228,19 @@ pub fn start_capture(
                 break;
             }
 
+            // Phase 7C pause: keep draining the mic/system receivers so they don't
+            // overflow during a long break (lunch can be 60+ min), but DROP the
+            // bytes instead of forwarding them to the channel or writing to the
+            // session WAV file. When the user hits Resume the buffer is reset so
+            // pre-pause audio doesn't bleed into the post-pause stream.
+            let is_paused = pause_flag_clone.load(std::sync::atomic::Ordering::SeqCst);
+
             match receiver.recv_timeout(std::time::Duration::from_millis(10)) {
                 Ok(data) => {
-                    buffer.extend_from_slice(&data);
+                    if !is_paused {
+                        buffer.extend_from_slice(&data);
+                    }
+                    // else: silently drop the frame
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
                 Err(mpsc::RecvTimeoutError::Disconnected) => {
@@ -222,6 +250,16 @@ pub fn start_capture(
                     }
                     break;
                 }
+            }
+
+            // While paused: clear any leftover buffer so a chunk straddling the
+            // pause boundary doesn't leak. Also skip the periodic flush.
+            if is_paused {
+                if !buffer.is_empty() {
+                    buffer.clear();
+                }
+                last_flush = std::time::Instant::now();
+                continue;
             }
 
             // Flush buffer every 200ms — write to disk first so a channel.send failure
@@ -237,12 +275,49 @@ pub fn start_capture(
         }
     });
 
-    // Store the forwarder so we can stop it later
-    let forwarder = AudioForwarder { stop_flag };
+    // Store the forwarder so we can stop / pause / resume it later.
+    let forwarder = AudioForwarder { stop_flag, pause_flag };
     let mut active = state.active_receiver.lock().map_err(|e| e.to_string())?;
     *active = Some(forwarder);
 
     Ok(())
+}
+
+/// Pause the live audio forwarder. PCM frames are dropped (not written to the
+/// WAV file or forwarded to the JS channel) until ``resume_capture`` is called.
+/// The mic / system audio streams keep running underneath so resuming is instant.
+/// No-op if no capture is active or if already paused.
+#[tauri::command]
+pub fn pause_capture(state: State<'_, AudioState>) -> Result<bool, String> {
+    let active = state.active_receiver.lock().map_err(|e| e.to_string())?;
+    if let Some(forwarder) = active.as_ref() {
+        let was_paused = forwarder.is_paused();
+        forwarder.set_paused(true);
+        Ok(!was_paused)
+    } else {
+        Ok(false)
+    }
+}
+
+/// Resume a paused capture. No-op if no capture is active or if not paused.
+#[tauri::command]
+pub fn resume_capture(state: State<'_, AudioState>) -> Result<bool, String> {
+    let active = state.active_receiver.lock().map_err(|e| e.to_string())?;
+    if let Some(forwarder) = active.as_ref() {
+        let was_paused = forwarder.is_paused();
+        forwarder.set_paused(false);
+        Ok(was_paused)
+    } else {
+        Ok(false)
+    }
+}
+
+/// Query current pause state of the active capture. Returns Ok(false) if no
+/// capture is active.
+#[tauri::command]
+pub fn is_capture_paused(state: State<'_, AudioState>) -> Result<bool, String> {
+    let active = state.active_receiver.lock().map_err(|e| e.to_string())?;
+    Ok(active.as_ref().map(|f| f.is_paused()).unwrap_or(false))
 }
 
 /// Stop audio capture

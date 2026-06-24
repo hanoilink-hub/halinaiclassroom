@@ -331,6 +331,12 @@ class App {
                 return;
             }
 
+            // Phase 7C — capture the optional "Mục tiêu bổ sung hôm nay" textarea so
+            // the server can append it to the lesson's pre-existing objective when
+            // creating the live session.
+            const bonusObjectiveEl = document.getElementById('ssc-bonus-objective');
+            const bonusObjective = (bonusObjectiveEl?.value || '').trim();
+
             try {
                 await settingsManager.save({
                     ...settingsManager.get(),
@@ -342,6 +348,7 @@ class App {
                     halin_total_students_enrolled: totalStudents,
                     halin_lesson_plan_vocabulary: lpVocab,
                     halin_lesson_plan_grammar: lpGrammar,
+                    halin_bonus_objective: bonusObjective,
                 });
             } catch (e) {
                 if (status) {
@@ -879,6 +886,19 @@ class App {
             } finally {
                 this.isStarting = false;
             }
+        });
+
+        // Phase 7C — Pause/Resume button. Only enabled while a HaLin live session is running.
+        document.getElementById('btn-pause')?.addEventListener('click', async () => {
+            await this._toggleHalinPause();
+        });
+
+        // Phase 7C — Session picker controls.
+        document.getElementById('ssc-session-picker-refresh')?.addEventListener('click', () => {
+            this._loadHalinTodaySessions().catch((e) => console.warn('refresh picker:', e));
+        });
+        document.getElementById('ssc-session-picker-clear')?.addEventListener('click', () => {
+            this._clearHalinPickedSession();
         });
 
         document.getElementById('btn-result-dismiss')?.addEventListener('click', () => {
@@ -2064,7 +2084,194 @@ class App {
     }
 
     _bindHalinSessionFormUI() {
-        // (session info moved to main screen setup card)
+        // Phase 7C — Fetch today's sessions from the class roadmap as soon as the
+        // setup card is visible. Quiet failure if not logged in / no backend yet.
+        if (this._isAppAuthenticated?.()) {
+            this._loadHalinTodaySessions().catch((e) => {
+                console.warn('[App] today-sessions initial fetch failed:', e);
+            });
+        }
+    }
+
+    /**
+     * Phase 7C — Fetch sessions the logged-in teacher is scheduled to teach in
+     * the next 1 day window and render them as a picker above the manual form.
+     * When a session is picked, its topic/objectives/duration auto-fill the form
+     * fields. The teacher can still type freely to override.
+     */
+    async _loadHalinTodaySessions() {
+        const picker = document.getElementById('ssc-session-picker');
+        if (!picker) return;
+        const listEl = document.getElementById('ssc-session-picker-list');
+        const loadingEl = document.getElementById('ssc-session-picker-loading');
+        const emptyEl = document.getElementById('ssc-session-picker-empty');
+        const errorEl = document.getElementById('ssc-session-picker-error');
+
+        // Show picker, reset states.
+        picker.hidden = false;
+        if (loadingEl) loadingEl.hidden = false;
+        if (emptyEl) emptyEl.hidden = true;
+        if (errorEl) { errorEl.hidden = true; errorEl.textContent = ''; }
+        if (listEl) listEl.innerHTML = '';
+
+        const s = settingsManager.get();
+        const baseUrl = s.halin_base_url || DEFAULT_HALIN_API_BASE_URL;
+        const token = this._getHalinToken();
+        if (!token) {
+            if (loadingEl) loadingEl.hidden = true;
+            if (emptyEl) {
+                emptyEl.hidden = false;
+                emptyEl.textContent = 'Vào Settings → HaLin để đăng nhập trước khi xem lịch buổi.';
+            }
+            return;
+        }
+        let resp;
+        try {
+            const { listTodaySessions } = await import('./halin-client.js');
+            resp = await listTodaySessions({ baseUrl, token, daysAhead: 1 });
+        } catch (e) {
+            if (loadingEl) loadingEl.hidden = true;
+            if (errorEl) {
+                errorEl.hidden = false;
+                errorEl.textContent = `Không lấy được danh sách buổi: ${e?.message || e}`;
+            }
+            return;
+        }
+        if (loadingEl) loadingEl.hidden = true;
+        const items = Array.isArray(resp?.items) ? resp.items : [];
+        this._halinTodaySessions = items;
+        if (!items.length) {
+            if (emptyEl) emptyEl.hidden = false;
+            return;
+        }
+        // Render the list.
+        const today = new Date().toISOString().slice(0, 10);
+        for (const it of items) {
+            const li = document.createElement('li');
+            li.className = 'session-picker-item';
+            li.dataset.planId = String(it.id);
+            const eff = String(it.effective_date || it.planned_date || '');
+            const dateLabel = eff === today ? 'Hôm nay' : eff;
+            const cls = it.class_code
+                ? `${it.class_code}${it.class_name ? ' — ' + it.class_name : ''}`
+                : (it.class_name || '');
+            li.innerHTML = `
+                <div class="session-picker-item-row1">
+                    <span>Bài ${it.session_no} · ${dateLabel}</span>
+                    <span>${(it.duration_minutes || 0)} phút</span>
+                </div>
+                <div class="session-picker-item-row2">${this._escapeHtml(it.topic || '(chưa có chủ đề)')}</div>
+                <div class="session-picker-item-meta">${this._escapeHtml(cls)}</div>
+            `;
+            li.addEventListener('click', () => this._selectHalinSession(it));
+            listEl.appendChild(li);
+        }
+        // Auto-select if exactly 1 session today (most common case).
+        const todays = items.filter((x) => x.effective_date === today);
+        if (todays.length === 1) {
+            this._selectHalinSession(todays[0]);
+        }
+    }
+
+    _escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, (c) =>
+            ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]),
+        );
+    }
+
+    /** Apply a picked session to the form: auto-fill topic/duration, store ID. */
+    _selectHalinSession(item) {
+        if (!item || !item.id) return;
+        // Highlight in the list.
+        document.querySelectorAll('#ssc-session-picker-list .session-picker-item')
+            .forEach((el) => el.classList.toggle('selected', el.dataset.planId === String(item.id)));
+        // Persist the chosen plan id into settings — start() reads it.
+        const s = settingsManager.get();
+        settingsManager.save({
+            ...s,
+            halin_class_lesson_plan_id: String(item.id),
+            // We keep the manual fields auto-filled so the form looks consistent and
+            // the teacher can edit if needed.
+            session_title: item.topic || s.session_title,
+            halin_topic: item.topic || s.halin_topic,
+            halin_objective: item.objectives || s.halin_objective,
+        }).catch(() => {});
+        const topicEl = document.getElementById('ssc-topic');
+        if (topicEl && item.topic) topicEl.value = item.topic;
+        // Render the "selected" summary row.
+        const selBox = document.getElementById('ssc-session-picker-selected');
+        const selName = document.getElementById('ssc-session-picker-selected-name');
+        if (selName) {
+            const cls = item.class_code ? `${item.class_code}` : (item.class_name || '');
+            selName.textContent = `${cls} — Bài ${item.session_no}: ${item.topic || ''}`;
+        }
+        if (selBox) selBox.hidden = false;
+    }
+
+    _clearHalinPickedSession() {
+        const s = settingsManager.get();
+        settingsManager.save({
+            ...s,
+            halin_class_lesson_plan_id: '',
+            halin_bonus_objective: '',
+        }).catch(() => {});
+        document.querySelectorAll('#ssc-session-picker-list .session-picker-item')
+            .forEach((el) => el.classList.remove('selected'));
+        const selBox = document.getElementById('ssc-session-picker-selected');
+        if (selBox) selBox.hidden = true;
+        const bonus = document.getElementById('ssc-bonus-objective');
+        if (bonus) bonus.value = '';
+    }
+
+    /** Toggle the pause/resume state. Called by the #btn-pause click handler. */
+    async _toggleHalinPause() {
+        if (!this.halinSession?.isEnabled?.() || !this.halinSession.running) return;
+        const btn = document.getElementById('btn-pause');
+        if (!btn) return;
+        const wasPaused = this.halinSession.isPaused();
+        btn.disabled = true;
+        try {
+            if (wasPaused) {
+                // Resume: Rust first (so audio flows again), then backend.
+                try { await invoke('resume_capture'); } catch (e) {
+                    console.warn('[App] resume_capture failed:', e);
+                }
+                await this.halinSession.resume();
+            } else {
+                // Pause: backend first (so the break boundary is recorded), then Rust.
+                await this.halinSession.pause();
+                try { await invoke('pause_capture'); } catch (e) {
+                    console.warn('[App] pause_capture failed:', e);
+                }
+            }
+            this._updatePauseButton();
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    /** Update the pause button label + icon based on session state. */
+    _updatePauseButton() {
+        const btn = document.getElementById('btn-pause');
+        if (!btn) return;
+        const running = Boolean(this.halinSession?.running);
+        const enabled = Boolean(this.halinSession?.isEnabled?.());
+        if (!running || !enabled) {
+            btn.hidden = true;
+            return;
+        }
+        btn.hidden = false;
+        const paused = this.halinSession.isPaused();
+        btn.classList.toggle('paused', paused);
+        const label = document.getElementById('btn-pause-label');
+        const iconPause = document.getElementById('icon-pause');
+        const iconResume = document.getElementById('icon-resume');
+        if (label) label.textContent = paused ? 'Tiếp tục' : 'Tạm dừng';
+        if (iconPause) iconPause.style.display = paused ? 'none' : '';
+        if (iconResume) iconResume.style.display = paused ? '' : 'none';
+        btn.title = paused
+            ? 'Tiếp tục buổi học (giờ nghỉ kết thúc)'
+            : 'Tạm dừng buổi học (giờ nghỉ trưa / giải lao)';
     }
 
     _updateModeUI(mode) {
@@ -2559,6 +2766,9 @@ class App {
         const iconPlay = document.getElementById('icon-play');
         const iconStop = document.getElementById('icon-stop');
         const label = document.getElementById('btn-start-label');
+
+        // Phase 7C — keep the pause button in sync with the recording state.
+        this._updatePauseButton?.();
 
         btn.classList.toggle('recording', this.isRunning);
         iconPlay.style.display = this.isRunning ? 'none' : 'block';
