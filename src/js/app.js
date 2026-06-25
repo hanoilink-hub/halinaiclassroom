@@ -39,6 +39,9 @@ class App {
         this.isRunning = false;
         this.isStarting = false; // Guard against re-entry
         this._sessionSetupConfirmed = false; // Must re-confirm setup after each stop
+        this._manualEntryMode = false; // True when teacher opts into ad-hoc manual form
+        this._halinSelectedSession = null;
+        this._halinTodaySessions = [];
         this._isPollingJob = false; // True while waiting for backend analysis result
         this.currentSource = 'system'; // 'system' | 'microphone' | 'both'
         this.translationMode = 'soniox'; // 'soniox' | 'local'
@@ -220,40 +223,47 @@ class App {
         if (le) le.textContent = lastErr ? String(lastErr).slice(0, 180) : '—';
     }
 
-    /** Khi tắt HaLin Phân Tích: luôn được bắt đầu. Khi bật: cần chủ đề đã lưu trong cài đặt. */
+    /** Khi tắt HaLin Phân Tích: luôn được bắt đầu. Khi bật: cần lưu thiết lập (chọn buổi lộ trình hoặc nhập chủ đề). */
     _sessionSetupAllowsStart() {
         if (!this.halinSession?.isEnabled?.()) return true;
-        // After each stop, teacher must re-confirm setup by clicking "Lưu thiết lập"
-        return this._sessionSetupConfirmed &&
-               String(settingsManager.get().halin_topic || '').trim().length > 0;
+        if (!this._sessionSetupConfirmed) return false;
+        const s = settingsManager.get();
+        const hasPlan = String(s.halin_class_lesson_plan_id || '').trim().length > 0;
+        const hasTopic = String(s.halin_topic || '').trim().length > 0;
+        return hasPlan || hasTopic;
     }
 
     _resetSessionSetupForm() {
         // Clear transient per-session fields (topic, schedule, students, lesson plan)
-        const tpEl = document.getElementById('ssc-topic');
-        if (tpEl) tpEl.value = '';
+        this._manualEntryMode = false;
+        this._halinSelectedSession = null;
+        this._clearHalinPickedSession();
 
-        const schedEl = document.getElementById('ssc-scheduled-start');
-        if (schedEl) schedEl.value = '';
-
-        const totalEl = document.getElementById('ssc-total-students');
-        if (totalEl) totalEl.value = '';
-
-        const lpVocabEl = document.getElementById('ssc-lesson-plan-vocab');
-        if (lpVocabEl) lpVocabEl.value = '';
-
-        const lpGrammarEl = document.getElementById('ssc-lesson-plan-grammar');
-        if (lpGrammarEl) lpGrammarEl.value = '';
-
-        // Keep lesson type & level as-is (useful defaults for next session)
-        // Clear topic from persisted settings so app restart also shows empty
         settingsManager.saveDebounced({
             halin_topic: '',
+            halin_objective: '',
+            halin_class_lesson_plan_id: '',
+            halin_bonus_objective: '',
             halin_scheduled_start: '',
             halin_total_students_enrolled: '',
             halin_lesson_plan_vocabulary: '',
             halin_lesson_plan_grammar: '',
         });
+
+        const tpEl = document.getElementById('ssc-topic');
+        if (tpEl) tpEl.value = '';
+        const schedEl = document.getElementById('ssc-scheduled-start');
+        if (schedEl) schedEl.value = '';
+        const totalEl = document.getElementById('ssc-total-students');
+        if (totalEl) totalEl.value = '';
+        const lpVocabEl = document.getElementById('ssc-lesson-plan-vocab');
+        if (lpVocabEl) lpVocabEl.value = '';
+        const lpGrammarEl = document.getElementById('ssc-lesson-plan-grammar');
+        if (lpGrammarEl) lpGrammarEl.value = '';
+        const bonus = document.getElementById('ssc-bonus-objective');
+        if (bonus) bonus.value = '';
+
+        this._loadHalinTodaySessions().catch(() => {});
 
         // Update status hint
         const statusEl = document.getElementById('ssc-status');
@@ -297,10 +307,13 @@ class App {
             if (lpGrammarEl && document.activeElement !== lpGrammarEl) lpGrammarEl.value = String(ss.halin_lesson_plan_grammar || '');
             syncHint();
             if (status) {
+                const s = settingsManager.get();
+                const hasPlan = String(s.halin_class_lesson_plan_id || '').trim().length > 0;
+                const hasTopic = String(s.halin_topic || '').trim().length > 0;
                 const canStart = this._sessionSetupAllowsStart();
                 status.textContent = canStart
                     ? '✓ Sẵn sàng bắt đầu'
-                    : (String(settingsManager.get().halin_topic || '').trim().length > 0
+                    : (hasPlan || hasTopic
                         ? 'Bấm Lưu thiết lập để xác nhận buổi học mới'
                         : '');
                 status.className = canStart ? 'ssc-status ready' : 'ssc-status';
@@ -313,7 +326,12 @@ class App {
         btnSave.addEventListener('click', async () => {
             const lesson = ltEl?.value || 'mixed';
             const level = lvEl?.value || 'N4';
-            const topic = tpEl?.value.trim() || '';
+            const saved = settingsManager.get();
+            const planId = String(saved.halin_class_lesson_plan_id || '').trim();
+            const topic =
+                tpEl?.value.trim() ||
+                String(saved.halin_topic || '').trim() ||
+                String(this._halinSelectedSession?.topic || '').trim();
             const halinOn = this.halinSession?.isEnabled?.() ? true : false;
             const expectedMode =
                 document.querySelector('input[name="ssc-expected-mode"]:checked')?.value || 'qa';
@@ -322,12 +340,17 @@ class App {
             const lpVocab = lpVocabEl?.value || '';
             const lpGrammar = lpGrammarEl?.value || '';
 
-            if (halinOn && !topic) {
+            if (halinOn && !topic && !planId) {
                 if (status) {
-                    status.textContent = '⚠️ Nhập chủ đề để bật HaLin Phân Tích';
+                    status.textContent = planId
+                        ? '⚠️ Chọn buổi từ lộ trình hoặc nhập chủ đề'
+                        : '⚠️ Chọn buổi từ lộ trình hoặc nhập chủ đề thủ công';
                     status.className = 'ssc-status';
                 }
-                tpEl?.focus();
+                if (!planId) {
+                    this._enableManualEntryMode();
+                    tpEl?.focus();
+                }
                 return;
             }
 
@@ -343,6 +366,7 @@ class App {
                     halin_lesson_type: lesson,
                     halin_level: level,
                     halin_topic: topic,
+                    session_title: topic || saved.session_title,
                     halin_expected_interaction_mode: expectedMode,
                     halin_scheduled_start: scheduledStart,
                     halin_total_students_enrolled: totalStudents,
@@ -865,7 +889,7 @@ class App {
         document.getElementById('btn-start').addEventListener('click', async () => {
             if (this.isStarting) return; // Prevent re-entry
             if (!this.isRunning && !this._sessionSetupAllowsStart()) {
-                this._showToast('Nhập chủ đề trong Thiết lập buổi học và bấm Lưu thiết lập, hoặc tắt HaLin Phân Tích.', 'error');
+                this._showToast('Chọn buổi từ lộ trình và bấm Lưu thiết lập, hoặc tắt HaLin Phân Tích.', 'error');
                 return;
             }
             try {
@@ -898,7 +922,10 @@ class App {
             this._loadHalinTodaySessions().catch((e) => console.warn('refresh picker:', e));
         });
         document.getElementById('ssc-session-picker-clear')?.addEventListener('click', () => {
-            this._clearHalinPickedSession();
+            this._clearHalinPickedSession({ enableManual: true });
+        });
+        document.getElementById('ssc-show-manual-form')?.addEventListener('click', () => {
+            this._enableManualEntryMode();
         });
 
         document.getElementById('btn-result-dismiss')?.addEventListener('click', () => {
@@ -1202,7 +1229,7 @@ class App {
                 e.preventDefault();
                 if (this.isStarting) return;
                 if (!this.isRunning && !this._sessionSetupAllowsStart()) {
-                    this._showToast('Nhập chủ đề trong Thiết lập buổi học và bấm Lưu thiết lập, hoặc tắt HaLin Phân Tích.', 'error');
+                    this._showToast('Chọn buổi từ lộ trình và bấm Lưu thiết lập, hoặc tắt HaLin Phân Tích.', 'error');
                     return;
                 }
                 (async () => {
@@ -2093,11 +2120,59 @@ class App {
         }
     }
 
+    _normalizePlanLevel(raw) {
+        const s = String(raw || '').trim().toUpperCase();
+        if (!s) return null;
+        const jlpt = s.match(/\bN[1-5]\b/);
+        if (jlpt) return jlpt[0];
+        const cefr = s.match(/\b[ABC][12]\b/);
+        if (cefr) return cefr[0];
+        return s.length <= 8 ? s : null;
+    }
+
+    _enableManualEntryMode() {
+        this._manualEntryMode = true;
+        this._halinSelectedSession = null;
+        const s = settingsManager.get();
+        settingsManager.save({
+            ...s,
+            halin_class_lesson_plan_id: '',
+            halin_bonus_objective: '',
+        }).catch(() => {});
+        document.querySelectorAll('#ssc-session-picker-list .session-picker-item')
+            .forEach((el) => el.classList.remove('selected'));
+        const selBox = document.getElementById('ssc-session-picker-selected');
+        if (selBox) selBox.hidden = true;
+        const bonus = document.getElementById('ssc-bonus-objective');
+        if (bonus) bonus.value = '';
+        this._updateSessionSetupFormMode();
+        document.getElementById('ssc-topic')?.focus();
+    }
+
+    /** Ẩn/hiện form thủ công vs chọn buổi theo lộ trình. */
+    _updateSessionSetupFormMode() {
+        const manualForm = document.getElementById('ssc-manual-form');
+        const manualLink = document.getElementById('ssc-manual-entry-link');
+        const subtitle = document.querySelector('#session-setup-card .ssc-subtitle');
+        const hasTodaySessions = Array.isArray(this._halinTodaySessions) && this._halinTodaySessions.length > 0;
+        const hasPicked = !!String(settingsManager.get().halin_class_lesson_plan_id || '').trim();
+        const showManual = this._manualEntryMode || !hasTodaySessions;
+
+        if (manualForm) manualForm.hidden = !showManual;
+        if (manualLink) manualLink.hidden = !hasTodaySessions || this._manualEntryMode;
+        if (subtitle) {
+            subtitle.textContent = showManual && !hasPicked
+                ? 'Nhập buổi ad-hoc hoặc chọn từ lộ trình phía trên'
+                : hasPicked
+                    ? 'Chọn buổi và lưu — trình độ lấy từ lớp học'
+                    : 'Chọn buổi hôm nay từ lộ trình và lưu trước khi ghi nhận';
+        }
+    }
+
     /**
-     * Phase 7C — Fetch sessions the logged-in teacher is scheduled to teach in
-     * the next 1 day window and render them as a picker above the manual form.
-     * When a session is picked, its topic/objectives/duration auto-fill the form
-     * fields. The teacher can still type freely to override.
+     * Phase 7C — Fetch sessions the logged-in teacher is scheduled to teach today
+     * and render them as a picker. Manual form stays hidden unless no sessions or
+     * teacher opts into ad-hoc entry.
      */
     async _loadHalinTodaySessions() {
         const picker = document.getElementById('ssc-session-picker');
@@ -2123,29 +2198,40 @@ class App {
                 emptyEl.hidden = false;
                 emptyEl.textContent = 'Vào Settings → HaLin để đăng nhập trước khi xem lịch buổi.';
             }
+            this._halinTodaySessions = [];
+            this._updateSessionSetupFormMode();
             return;
         }
         let resp;
         try {
             const { listTodaySessions } = await import('./halin-client.js');
-            resp = await listTodaySessions({ baseUrl, token, daysAhead: 1 });
+            // Phase 7C polish — chỉ lấy buổi HÔM NAY. Trước đây daysAhead=1 hiển
+            // thị cả buổi ngày mai khiến GV bối rối. Nếu muốn ghi buổi không có
+            // trong lộ trình (ad-hoc), GV bấm "Nhập thủ công".
+            resp = await listTodaySessions({ baseUrl, token, daysAhead: 0 });
         } catch (e) {
             if (loadingEl) loadingEl.hidden = true;
             if (errorEl) {
                 errorEl.hidden = false;
                 errorEl.textContent = `Không lấy được danh sách buổi: ${e?.message || e}`;
             }
+            this._halinTodaySessions = [];
+            this._updateSessionSetupFormMode();
             return;
         }
         if (loadingEl) loadingEl.hidden = true;
-        const items = Array.isArray(resp?.items) ? resp.items : [];
+        const today = new Date().toISOString().slice(0, 10);
+        const items = (Array.isArray(resp?.items) ? resp.items : []).filter((x) => {
+            const eff = String(x.effective_date || x.planned_date || '');
+            return eff === today;
+        });
         this._halinTodaySessions = items;
         if (!items.length) {
             if (emptyEl) emptyEl.hidden = false;
+            this._updateSessionSetupFormMode();
             return;
         }
         // Render the list.
-        const today = new Date().toISOString().slice(0, 10);
         for (const it of items) {
             const li = document.createElement('li');
             li.className = 'session-picker-item';
@@ -2155,9 +2241,12 @@ class App {
             const cls = it.class_code
                 ? `${it.class_code}${it.class_name ? ' — ' + it.class_name : ''}`
                 : (it.class_name || '');
+            const levelBadge = it.class_level
+                ? `<span class="session-picker-level-badge">${this._escapeHtml(it.class_level)}</span>`
+                : '';
             li.innerHTML = `
                 <div class="session-picker-item-row1">
-                    <span>Bài ${it.session_no} · ${dateLabel}</span>
+                    <span>Bài ${it.session_no} · ${dateLabel} ${levelBadge}</span>
                     <span>${(it.duration_minutes || 0)} phút</span>
                 </div>
                 <div class="session-picker-item-row2">${this._escapeHtml(it.topic || '(chưa có chủ đề)')}</div>
@@ -2168,8 +2257,18 @@ class App {
         }
         // Auto-select if exactly 1 session today (most common case).
         const todays = items.filter((x) => x.effective_date === today);
-        if (todays.length === 1) {
+        const savedPlanId = String(settingsManager.get().halin_class_lesson_plan_id || '').trim();
+        if (savedPlanId && !this._manualEntryMode) {
+            const found = items.find((x) => String(x.id) === savedPlanId);
+            if (found) {
+                this._selectHalinSession(found);
+                return;
+            }
+        }
+        if (todays.length === 1 && !this._manualEntryMode) {
             this._selectHalinSession(todays[0]);
+        } else {
+            this._updateSessionSetupFormMode();
         }
     }
 
@@ -2179,36 +2278,50 @@ class App {
         );
     }
 
-    /** Apply a picked session to the form: auto-fill topic/duration, store ID. */
+    /** Apply a picked session: store plan id, auto-fill level/topic, hide manual form. */
     _selectHalinSession(item) {
         if (!item || !item.id) return;
-        // Highlight in the list.
+        this._manualEntryMode = false;
+        this._halinSelectedSession = item;
         document.querySelectorAll('#ssc-session-picker-list .session-picker-item')
             .forEach((el) => el.classList.toggle('selected', el.dataset.planId === String(item.id)));
-        // Persist the chosen plan id into settings — start() reads it.
+
+        const level = this._normalizePlanLevel(item.class_level);
         const s = settingsManager.get();
-        settingsManager.save({
+        const patch = {
             ...s,
             halin_class_lesson_plan_id: String(item.id),
-            // We keep the manual fields auto-filled so the form looks consistent and
-            // the teacher can edit if needed.
             session_title: item.topic || s.session_title,
             halin_topic: item.topic || s.halin_topic,
             halin_objective: item.objectives || s.halin_objective,
-        }).catch(() => {});
+        };
+        if (level) patch.halin_level = level;
+        settingsManager.save(patch).catch(() => {});
+
         const topicEl = document.getElementById('ssc-topic');
         if (topicEl && item.topic) topicEl.value = item.topic;
-        // Render the "selected" summary row.
+        const lvEl = document.getElementById('ssc-level');
+        if (lvEl && level) this._ensureSelectOption(lvEl, level);
+
         const selBox = document.getElementById('ssc-session-picker-selected');
         const selName = document.getElementById('ssc-session-picker-selected-name');
         if (selName) {
             const cls = item.class_code ? `${item.class_code}` : (item.class_name || '');
-            selName.textContent = `${cls} — Bài ${item.session_no}: ${item.topic || ''}`;
+            const levelLabel = level ? ` · ${level}` : '';
+            selName.textContent = `${cls} — Bài ${item.session_no}${levelLabel}: ${item.topic || ''}`;
         }
         if (selBox) selBox.hidden = false;
+        this._updateSessionSetupFormMode();
+        this._syncSessionSetupCard?.(settingsManager.get());
     }
 
-    _clearHalinPickedSession() {
+    _clearHalinPickedSession(opts = {}) {
+        const enableManual = opts.enableManual === true;
+        if (enableManual) {
+            this._enableManualEntryMode();
+            return;
+        }
+        this._halinSelectedSession = null;
         const s = settingsManager.get();
         settingsManager.save({
             ...s,
@@ -2221,6 +2334,7 @@ class App {
         if (selBox) selBox.hidden = true;
         const bonus = document.getElementById('ssc-bonus-objective');
         if (bonus) bonus.value = '';
+        this._updateSessionSetupFormMode();
     }
 
     /** Toggle the pause/resume state. Called by the #btn-pause click handler. */
@@ -2291,7 +2405,7 @@ class App {
         }
 
         if (!this._sessionSetupAllowsStart()) {
-            this._showToast('Nhập chủ đề trong Thiết lập buổi học và bấm Lưu thiết lập, hoặc tắt HaLin Phân Tích.', 'error');
+            this._showToast('Chọn buổi từ lộ trình và bấm Lưu thiết lập, hoặc tắt HaLin Phân Tích.', 'error');
             return;
         }
 

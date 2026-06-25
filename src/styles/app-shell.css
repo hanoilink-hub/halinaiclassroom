@@ -2012,6 +2012,40 @@
   color: var(--text-muted, #5e6e63);
   opacity: 0.85;
 }
+.session-picker-level-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #1d4e2c;
+  background: #e7f4eb;
+  border: 1px solid #b8dcc6;
+  vertical-align: middle;
+}
+.session-picker-footer {
+  margin-top: 8px;
+  text-align: center;
+}
+.ssc-manual-hint {
+  margin: 0 0 4px;
+  font-size: 0.86rem;
+  color: var(--text-muted, #5e6e63);
+}
+.ssc-manual-advanced {
+  margin-top: 4px;
+}
+.ssc-manual-advanced-summary {
+  cursor: pointer;
+  font-size: 0.86rem;
+  color: var(--accent, #2f8a4f);
+  user-select: none;
+}
+.ssc-manual-advanced-body {
+  margin-top: 10px;
+}
 .session-picker-selected {
   margin-top: 10px;
   padding-top: 10px;

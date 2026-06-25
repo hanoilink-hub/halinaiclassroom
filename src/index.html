@@ -362,10 +362,8 @@
             </div>
           </div>
 
-          <!-- Phase 7C — Auto-fetch sessions from class roadmap. When the teacher
-               picks a session here, topic/objective/lesson_type/duration get
-               auto-filled below. The manual fields remain editable as a fallback
-               for ad-hoc sessions that aren't in the roadmap. -->
+          <!-- Phase 7C — Chọn buổi hôm nay từ lộ trình. Form thủ công chỉ hiện khi
+               không có buổi hoặc GV chọn "Nhập thủ công". Trình độ (N5/N4…) lấy từ lớp. -->
           <div id="ssc-session-picker" class="session-picker" hidden>
             <div class="session-picker-header">
               <strong>📅 Chọn buổi từ lộ trình lớp học</strong>
@@ -377,15 +375,20 @@
               Đang lấy danh sách buổi học hôm nay…
             </div>
             <div id="ssc-session-picker-empty" class="session-picker-hint" hidden>
-              Không có buổi học nào trong hôm nay. Bạn có thể nhập thủ công ở bên dưới.
+              Không có buổi học nào hôm nay — nhập thủ công bên dưới.
             </div>
             <div id="ssc-session-picker-error" class="session-picker-hint session-picker-error" hidden></div>
             <ul id="ssc-session-picker-list" class="session-picker-list" role="listbox" aria-label="Buổi học có sẵn"></ul>
+            <div id="ssc-manual-entry-link" class="session-picker-footer" hidden>
+              <button type="button" id="ssc-show-manual-form" class="ssc-link-btn">
+                Buổi không có trong lộ trình? Nhập thủ công
+              </button>
+            </div>
             <div id="ssc-session-picker-selected" class="session-picker-selected" hidden>
               <div class="session-picker-selected-row">
                 <span class="session-picker-selected-label">Đã chọn:</span>
                 <span id="ssc-session-picker-selected-name"></span>
-                <button type="button" id="ssc-session-picker-clear" class="ssc-link-btn">Bỏ chọn / Nhập thủ công</button>
+                <button type="button" id="ssc-session-picker-clear" class="ssc-link-btn">Bỏ chọn</button>
               </div>
               <div class="ssc-field">
                 <label class="ssc-label" for="ssc-bonus-objective">
@@ -401,7 +404,10 @@
             </div>
           </div>
 
-          <div class="ssc-body ssc-grid">
+          <div id="ssc-manual-form" class="ssc-body ssc-grid" hidden>
+            <p id="ssc-manual-form-hint" class="ssc-manual-hint ssc-span-2">
+              Nhập nhanh thông tin buổi ad-hoc (không có trong lộ trình).
+            </p>
             <div class="ssc-row ssc-span-2">
               <div class="ssc-field">
                 <label class="ssc-label" for="ssc-lesson-type">Loại bài</label>
@@ -457,6 +463,9 @@
             </div>
           </div>
 
+          <details class="ssc-manual-advanced ssc-span-2">
+            <summary class="ssc-manual-advanced-summary">Tuỳ chọn thêm (giờ bắt đầu, số HV, từ vựng…)</summary>
+            <div class="ssc-manual-advanced-body ssc-grid">
           <div class="ssc-field">
             <label class="ssc-label" for="ssc-scheduled-start">Giờ bắt đầu dự kiến</label>
             <input type="datetime-local" id="ssc-scheduled-start" class="ssc-input" />
@@ -476,6 +485,8 @@
             <label class="ssc-label" for="ssc-lesson-plan-grammar">Ngữ pháp mục tiêu</label>
             <textarea id="ssc-lesson-plan-grammar" class="ssc-textarea" rows="2" placeholder="Ngữ pháp mục tiêu, cách nhau bằng dấu phẩy: 〜ていただけませんか"></textarea>
           </div>
+            </div>
+          </details>
 
           </div>
 
