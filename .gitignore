@@ -44,6 +44,8 @@ test_audio.wav
 # Agent configs (internal)
 CLAUDE.md
 GEMINI.md
+AGENTS.md
+.claude/skills/gitnexus/
 
 # Internal dev files (private repo only)
 dev-logs/
