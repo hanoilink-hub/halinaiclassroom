@@ -46,6 +46,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          shared-key: macos-aarch64
 
       - name: Install dependencies
         run: npm install
@@ -68,7 +69,7 @@ jobs:
             src-tauri/target/release/bundle/dmg/*.dmg
 
   build-macos-intel:
-    runs-on: macos-14  # Cross-compile to Intel
+    runs-on: macos-15-intel  # Native x86_64 — cross-compile từ macos-14 hay fail với Swift/screencapturekit
     steps:
       - uses: actions/checkout@v4
 
@@ -96,13 +97,12 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-apple-darwin
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          shared-key: macos-x86_64
 
       - name: Install dependencies
         run: npm install
@@ -112,7 +112,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
           TAURI_SKIP_SIGNING: true
-        run: npm run tauri build -- --target x86_64-apple-darwin
+        run: npm run tauri build
 
 
 
@@ -128,9 +128,9 @@ jobs:
         with:
           name: macos-intel-build
           path: |
-            src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app.tar.gz
-            src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app.tar.gz.sig
-            src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
+            src-tauri/target/release/bundle/dmg/*.dmg
 
   build-windows:
     runs-on: windows-latest
@@ -149,6 +149,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          shared-key: windows-x86_64
 
       - name: Install dependencies
         run: npm install
