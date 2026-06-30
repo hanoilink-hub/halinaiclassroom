@@ -125,6 +125,50 @@ class App {
         return this._refreshPromise;
     }
 
+    /** JWT login: refresh access token on cold start before API calls. */
+    async _restoreHalinSessionOnStartup() {
+        const s = settingsManager.get();
+        const refreshToken = String(s.halin_refresh_token || '').trim();
+        const accessToken = String(s.halin_access_token || '').trim();
+        const legacyToken = String(s.halin_api_token || '').trim();
+        if (!refreshToken || legacyToken) return;
+
+        const baseUrl = s.halin_base_url || DEFAULT_HALIN_API_BASE_URL;
+        try {
+            if (accessToken) {
+                await halinMe({ baseUrl, accessToken });
+                return;
+            }
+        } catch (e) {
+            if (!shouldRetryAuthAfterErrorMessage(e?.message)) {
+                console.warn('[HaLin] startup session check:', e);
+                return;
+            }
+        }
+        try {
+            await this._refreshTokenOnce(baseUrl, refreshToken);
+            await halinMe({ baseUrl, accessToken: this._getHalinToken() });
+        } catch (e) {
+            console.warn('[HaLin] startup token refresh failed:', e);
+            await this._forceReLogin('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+        }
+    }
+
+    async _forceReLogin(message) {
+        const s = settingsManager.get();
+        try {
+            await settingsManager.save({
+                ...s,
+                halin_access_token: '',
+                halin_refresh_token: '',
+            });
+        } catch {
+            /* still show login */
+        }
+        if (message) this._showToast(message, 'warning');
+        this._applyAuthShell();
+    }
+
     /**
      * Phase 1 of long-session refactor: finalize the on-disk WAV, archive a copy for QA,
      * upload to HaLin, delete the temp file. Returns true if audio was captured (even
@@ -476,6 +520,7 @@ class App {
         this._initAboutTab();
         this._checkForUpdates();
 
+        await this._restoreHalinSessionOnStartup();
         this._applyAuthShell();
 
         // Keep OS always-on-top in sync with default (see tauri.conf + isPinned)
@@ -2208,12 +2253,29 @@ class App {
             // Phase 7C polish — chỉ lấy buổi HÔM NAY. Trước đây daysAhead=1 hiển
             // thị cả buổi ngày mai khiến GV bối rối. Nếu muốn ghi buổi không có
             // trong lộ trình (ad-hoc), GV bấm "Nhập thủ công".
-            resp = await listTodaySessions({ baseUrl, token, daysAhead: 0 });
+            const fetchSessions = (tok) => listTodaySessions({ baseUrl, token: tok, daysAhead: 0 });
+            try {
+                resp = await fetchSessions(token);
+            } catch (e) {
+                const rt = String(s.halin_refresh_token || '').trim();
+                if (rt && shouldRetryAuthAfterErrorMessage(e?.message)) {
+                    await this._refreshTokenOnce(baseUrl, rt);
+                    resp = await fetchSessions(this._getHalinToken());
+                } else {
+                    throw e;
+                }
+            }
         } catch (e) {
             if (loadingEl) loadingEl.hidden = true;
             if (errorEl) {
                 errorEl.hidden = false;
-                errorEl.textContent = `Không lấy được danh sách buổi: ${e?.message || e}`;
+                const msg = String(e?.message || e);
+                if (shouldRetryAuthAfterErrorMessage(msg) && String(s.halin_refresh_token || '').trim()) {
+                    errorEl.textContent = 'Phiên đăng nhập đã hết hạn. Đăng xuất và đăng nhập lại.';
+                    void this._forceReLogin('');
+                } else {
+                    errorEl.textContent = `Không lấy được danh sách buổi: ${msg}`;
+                }
             }
             this._halinTodaySessions = [];
             this._updateSessionSetupFormMode();
